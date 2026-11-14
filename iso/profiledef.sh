@@ -1,6 +1,9 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash disable=SC2034
 # Configuração do perfil archiso do Aura OS.
 # Copiado do perfil releng e adaptado. Variáveis são lidas pelo mkarchiso.
-# shellcheck disable=SC2034
+# SC2034 (variável não usada) é desativado aqui: as variáveis são consumidas
+# pelo mkarchiso, que lê este arquivo com `source`, e não pelo próprio script.
 
 # Data de referência do build. SOURCE_DATE_EPOCH torna a ISO reprodutível:
 # o mesmo commit gera o mesmo nome e label em qualquer máquina.
