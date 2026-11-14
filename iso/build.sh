@@ -3,7 +3,10 @@
 # Requer root porque o mkarchiso monta sistemas de arquivos.
 set -euo pipefail
 
-readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Declaração e atribuição separadas: com readonly na mesma linha, um erro
+# dentro da substituição de comando seria mascarado (SC2155).
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
 readonly WORK_DIR="${SCRIPT_DIR}/work"
 readonly OUT_DIR="${SCRIPT_DIR}/out"
 
