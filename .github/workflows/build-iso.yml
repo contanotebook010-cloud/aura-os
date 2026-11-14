@@ -1,0 +1,51 @@
+# Build da ISO do Aura OS em container Arch Linux oficial.
+# O usuário não precisa de um host Arch: o build roda aqui.
+name: build-iso
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Imagem oficial do Arch: as ferramentas (archiso, shellcheck) vêm dos
+    # repositórios oficiais, sem AUR. --privileged é necessário porque o
+    # mkarchiso monta sistemas de arquivos e cria loop devices.
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - name: Atualizar keyring e sistema
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm archlinux-keyring
+
+      - name: Instalar dependências de build
+        run: pacman -S --noconfirm --needed archiso shellcheck git
+
+      - uses: actions/checkout@v4
+
+      - name: Lint dos scripts
+        run: shellcheck iso/build.sh iso/profiledef.sh iso/airootfs/root/customize_airootfs.sh
+
+      - name: Construir a ISO
+        working-directory: iso
+        run: |
+          # Permite que o git leia o repositório clonado dentro do container.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # Data do último commit: a ISO fica idêntica para o mesmo commit.
+          SOURCE_DATE_EPOCH="$(git -C "$GITHUB_WORKSPACE" log -1 --format=%ct)" ./build.sh
+
+      - name: Enviar a ISO como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-os-iso
+          path: iso/out/*
+          if-no-files-found: error

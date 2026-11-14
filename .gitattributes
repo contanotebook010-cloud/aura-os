@@ -1,0 +1,4 @@
+# Scripts de shell precisam de terminações LF: CRLF quebra o bash no Linux.
+*.sh text eol=lf
+iso/airootfs/**/*.sh text eol=lf
+*.yml text eol=lf

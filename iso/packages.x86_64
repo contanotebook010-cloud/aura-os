@@ -1,0 +1,70 @@
+# Lista de pacotes da ISO. Somente repositórios oficiais (core, extra, multilib).
+# Pacotes do AUR não entram aqui: a ISO é construída offline de repositórios oficiais.
+# Os nomes foram conferidos de memória; confirme com `pacman -Si <pacote>` no host
+# Arch antes do primeiro build. Se algum não existir, remova e documente no README.
+
+# --- Base ---
+base
+linux
+linux-firmware
+intel-ucode
+amd-ucode
+
+# --- Rede e áudio ---
+networkmanager
+network-manager-applet
+bluez
+bluez-utils
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+zram-generator
+
+# --- Gráfico (VMware e hardware comum) ---
+xorg-server
+xorg-xinit
+mesa
+xf86-video-vmware
+xf86-input-vmmouse
+open-vm-tools
+
+# --- Desktop ---
+xfce4
+xfce4-goodies
+lightdm
+lightdm-gtk-greeter
+picom
+xfce4-notifyd
+
+# --- Tema e fontes ---
+materia-gtk-theme
+papirus-icon-theme
+ttf-roboto
+ttf-jetbrains-mono
+noto-fonts
+noto-fonts-emoji
+adwaita-icon-theme
+
+# --- Aplicativos ---
+alacritty
+thunar
+thunar-archive-plugin
+file-roller
+mpv
+eog
+firefox
+libreoffice-fresh
+libreoffice-fresh-pt-br
+hunspell-pt-br
+yt-dlp
+ffmpeg
+
+# --- Sistema ---
+sudo
+git
+base-devel
+xdg-user-dirs
+polkit-gnome
+htop
+fastfetch
