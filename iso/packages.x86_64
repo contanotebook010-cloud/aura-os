@@ -68,3 +68,7 @@ xdg-user-dirs
 polkit-gnome
 htop
 fastfetch
+
+# --- Boot (BIOS legado e UEFI) ---
+syslinux
+systemd
