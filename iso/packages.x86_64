@@ -25,7 +25,6 @@ zram-generator
 xorg-server
 xorg-xinit
 mesa
-xf86-video-vmware
 xf86-input-vmmouse
 open-vm-tools
 
@@ -56,7 +55,6 @@ eog
 firefox
 libreoffice-fresh
 libreoffice-fresh-pt-br
-hunspell-pt-br
 yt-dlp
 ffmpeg
 
