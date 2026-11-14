@@ -29,7 +29,6 @@ airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' 
 # executados dentro do sistema precisam de bit de execução. Cada entrada
 # aqui tem que existir no airootfs, senão o mkarchiso aborta o build.
 file_permissions=(
-  ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
   ["/root/customize_airootfs.sh"]="0:0:755"
   ["/usr/local/bin/aura-first-boot"]="0:0:755"
