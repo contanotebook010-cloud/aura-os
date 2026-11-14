@@ -1,7 +1,6 @@
-#!/usr/bin/env bash
-# shellcheck disable=SC2034
-# Definição do perfil archiso do Aura OS.
+# Configuração do perfil archiso do Aura OS.
 # Copiado do perfil releng e adaptado. Variáveis são lidas pelo mkarchiso.
+# shellcheck disable=SC2034
 
 # Data de referência do build. SOURCE_DATE_EPOCH torna a ISO reprodutível:
 # o mesmo commit gera o mesmo nome e label em qualquer máquina.
@@ -24,10 +23,12 @@ airootfs_image_type="squashfs"
 airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
 
 # Permissões explícitas: /root precisa ser privado (750) e os scripts
-# executados dentro do chroot precisam de bit de execução.
+# executados dentro do sistema precisam de bit de execução. Cada entrada
+# aqui tem que existir no airootfs, senão o mkarchiso aborta o build.
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/root"]="0:0:750"
   ["/root/customize_airootfs.sh"]="0:0:755"
   ["/usr/local/bin/aura-first-boot"]="0:0:755"
+  ["/usr/local/bin/aura-dl-host"]="0:0:755"
 )

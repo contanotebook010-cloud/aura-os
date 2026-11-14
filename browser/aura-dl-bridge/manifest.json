@@ -1,0 +1,16 @@
+{
+  "manifest_version": 2,
+  "name": "aura-dl",
+  "version": "0.1.0",
+  "description": "Baixa o vídeo da página ou de um link com o aura-dl, pelo menu de contexto.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "aura-dl@aura-os.local",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": ["menus", "activeTab", "nativeMessaging", "notifications"],
+  "background": {
+    "scripts": ["background.js"]
+  }
+}

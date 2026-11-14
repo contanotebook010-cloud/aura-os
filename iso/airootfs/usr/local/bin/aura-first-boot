@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Primeira execução do Aura OS para o usuário logado. Roda uma vez por usuário,
+# via autostart do XFCE. Idempotente: se o marcador existir, não faz nada.
+set -euo pipefail
+
+readonly MARKER="${XDG_CONFIG_HOME:-$HOME/.config}/aura/first-boot.done"
+
+if [[ -f "${MARKER}" ]]; then
+  exit 0
+fi
+
+# Cria as pastas padrão do usuário (Documentos, Downloads, Vídeos...) conforme
+# o idioma do locale. Isso garante que o aura-dl tenha a pasta de destino pronta.
+xdg-user-dirs-update
+
+# Marcador gravado só ao final: se algo falhar antes, a próxima sessão tenta de novo.
+mkdir -p -- "$(dirname -- "${MARKER}")"
+date --iso-8601=seconds > "${MARKER}"

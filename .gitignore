@@ -2,3 +2,6 @@ iso/work/
 iso/out/
 *.iso
 *.iso.sha256
+
+# Build do Rust
+aura-dl/target/

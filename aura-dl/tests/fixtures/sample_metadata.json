@@ -1,0 +1,9 @@
+{
+  "id": "dQw4w9WgXcQ",
+  "title": "Exemplo de vídeo: teste/duração",
+  "formats": [
+    {"format_id": "140", "ext": "m4a", "height": null, "vcodec": "none", "acodec": "mp4a.40.2", "abr": 129.5, "filesize": 2100000, "filesize_approx": null, "format_note": "medium"},
+    {"format_id": "137", "ext": "mp4", "height": 1080, "vcodec": "avc1.640028", "acodec": "none", "abr": null, "filesize": null, "filesize_approx": 85000000, "format_note": "1080p"},
+    {"format_id": "18", "ext": "mp4", "height": 360, "vcodec": "avc1.42001E", "acodec": "mp4a.40.2", "abr": 96.0, "filesize": 12000000, "filesize_approx": null, "format_note": "360p"}
+  ]
+}

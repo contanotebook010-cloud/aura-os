@@ -1,0 +1,27 @@
+[package]
+name = "aura-dl"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+description = "Downloader de vídeo e áudio do Aura OS, em torno do yt-dlp e do ffmpeg"
+
+[dependencies]
+# Parser de argumentos com derive: CLI declarativa e ajuda gerada automaticamente.
+clap = { version = "4", features = ["derive"] }
+# Parse do JSON de metadados que o yt-dlp emite com -J.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Erros tipados no núcleo; anyhow fica só no binário.
+thiserror = "1"
+anyhow = "1"
+# Validação de URL com parser da WHATWG, em vez de regex.
+url = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+# LTO e um codegen por vez: binário menor, relevante para a ISO.
+lto = true
+codegen-units = 1
+strip = true
