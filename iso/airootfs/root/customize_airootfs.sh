@@ -18,6 +18,12 @@ install -d -m 0750 /etc/sudoers.d
 printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/10-aura-live
 chmod 0440 /etc/sudoers.d/10-aura-live
 
+# Identidade e timezone básicos. Sem estes arquivos, o systemd-firstboot abre
+# o assistente interativo de configuração e impede a live de chegar ao XFCE.
+printf 'aura\n' > /etc/hostname
+printf 'LANG=C.UTF-8\n' > /etc/locale.conf
+ln -sfn /usr/share/zoneinfo/UTC /etc/localtime
+
 # Só os serviços necessários para a live. Serviços desnecessários aumentam
 # a superfície de ataque e o tempo de boot.
 systemctl enable NetworkManager.service

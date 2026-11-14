@@ -115,8 +115,16 @@ jobs:
           status=$?
           set -e
 
-          cat boot.log
-          if ! grep -Eq 'Started Light Display Manager|Reached target Graphical Interface|login:' boot.log; then
+          # O systemd colore a saída; removemos ANSI antes de procurar os marcos.
+          sed -E 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' boot.log > boot.clean.log
+          cat boot.clean.log
+
+          if grep -Fq 'Please configure the system!' boot.clean.log; then
+            echo "erro: a live parou no assistente systemd-firstboot" >&2
+            exit 1
+          fi
+
+          if ! grep -Eq 'Started Light Display Manager|Reached target Graphical Interface|login:' boot.clean.log; then
             echo "erro: a live não chegou ao gerenciador gráfico (qemu status ${status})" >&2
             exit 1
           fi
