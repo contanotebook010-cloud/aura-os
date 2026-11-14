@@ -81,3 +81,42 @@ jobs:
           name: aura-os-iso
           path: iso/out/*
           if-no-files-found: error
+
+  boot-smoke:
+    name: boot da ISO (QEMU)
+    runs-on: ubuntu-latest
+    needs: iso
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: aura-os-iso
+          path: iso/out
+
+      - name: Instalar QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86
+
+      - name: Iniciar a live em modo headless
+        run: |
+          iso="$(find iso/out -maxdepth 1 -type f -name '*.iso' -print -quit)"
+          test -n "${iso}"
+
+          set +e
+          timeout --signal=TERM 300 \
+            qemu-system-x86_64 \
+              -machine accel=tcg \
+              -m 2048 -smp 2 \
+              -display none \
+              -serial stdio \
+              -cdrom "${iso}" \
+              -boot d \
+              > boot.log 2>&1
+          status=$?
+          set -e
+
+          cat boot.log
+          if ! grep -Eq 'Started Light Display Manager|Reached target Graphical Interface|login:' boot.log; then
+            echo "erro: a live não chegou ao gerenciador gráfico (qemu status ${status})" >&2
+            exit 1
+          fi

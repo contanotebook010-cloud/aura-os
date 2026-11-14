@@ -1,12 +1,14 @@
 # Lista de pacotes da ISO. Somente repositórios oficiais (core, extra, multilib).
-# Pacotes do AUR não entram aqui: a ISO é construída offline de repositórios oficiais.
-# Os nomes foram conferidos de memória; confirme com `pacman -Si <pacote>` no host
-# Arch antes do primeiro build. Se algum não existir, remova e documente no README.
+# Os nomes dos pacotes são validados pelo build real da ISO no CI.
+# Pacotes do AUR não entram aqui.
 
 # --- Base ---
 base
 linux
 linux-firmware
+mkinitcpio
+mkinitcpio-archiso
+squashfs-tools
 intel-ucode
 amd-ucode
 
