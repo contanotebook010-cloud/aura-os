@@ -55,3 +55,9 @@ autologin-user=aura
 autologin-user-timeout=0
 autologin-session=xfce
 EOF
+
+# Falha cedo no build se uma alteração futura remover o grupo de autologin ou
+# o wrapper de sessão fornecido pelo pacote LightDM do Arch.
+getent group autologin >/dev/null
+id -nG "${LIVE_USER}" | grep -qw autologin
+test -x /etc/lightdm/Xsession

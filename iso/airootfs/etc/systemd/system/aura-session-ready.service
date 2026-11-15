@@ -1,7 +1,6 @@
 [Unit]
 Description=Verifica se a sessão XFCE da live foi iniciada
-After=lightdm.service
-Requires=lightdm.service
+After=systemd-logind.service
 
 [Service]
 Type=oneshot
