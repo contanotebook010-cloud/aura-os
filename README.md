@@ -1,23 +1,31 @@
 # Aura OS
 
-Distribuição Live/instalável baseada em Arch Linux, com XFCE4 estilizado em Material Design, cursor Bibata, ícones Papirus e o downloader `aura-dl` (em Rust).
+Distribuição live baseada em Arch Linux, com XFCE4 estilizado em Material
+Design, cursor Bibata, ícones Papirus e o downloader `aura-dl` (em Rust).
 
 ## Status
 
-Em desenvolvimento. Esta versão contém o perfil archiso e o pipeline de build. Ainda não estão incluídos:
+Em desenvolvimento. O perfil `archiso`, o pipeline de build e o smoke test de
+boot em QEMU estão implementados. Ainda não estão concluídos:
 
-- Tema Material (`theme/`)
-- Projeto `aura-dl` em Rust
-- PKGBUILDs de pacotes locais
-- Instalador (`installer/`)
-- Cursor Bibata (download com checksum SHA-256, a ser adicionado)
+- tema Material próprio (`theme/`);
+- instalador (`installer/`);
+- cursor Bibata (download com checksum SHA-256);
+- interface gráfica GTK4/libadwaita do `aura-dl`.
+
+O `aura-dl` em modo CLI e a ponte para Firefox/LibreWolf já são empacotados
+como repositório local e instalados na ISO.
 
 ## Requisitos para build
 
-Uma das opções abaixo:
+Em um host Arch Linux:
 
-- Um host Arch Linux com `archiso` instalado (`sudo pacman -S archiso`).
-- O workflow de GitHub Actions deste repositório, que roda em `archlinux:latest`.
+```bash
+sudo pacman -S --needed archiso base-devel libarchive rust
+```
+
+O workflow de GitHub Actions também constrói a ISO em `archlinux:latest`, sem
+exigir um host Arch local.
 
 ## Como gerar a ISO localmente
 
@@ -26,28 +34,53 @@ cd iso
 sudo ./build.sh
 ```
 
-A ISO sai em `iso/out/`, com o checksum SHA-256 ao lado. O build exige root porque o `mkarchiso` monta sistemas de arquivos.
+A ISO sai em `iso/out/`, com o checksum SHA-256 ao lado. O build exige root
+porque o `mkarchiso` monta sistemas de arquivos.
+
+Antes do `mkarchiso`, `packages/build-local-repo.sh` monta os pacotes próprios
+do Aura OS e cria o banco em `/tmp/aura-os-repo`. Nenhum arquivo gerado é
+gravado na árvore do repositório.
 
 ## Como testar
 
-- **QEMU/KVM (BIOS e UEFI):** `qemu-system-x86_64 -enable-kvm -m 4G -cdrom iso/out/aura-os-*.iso`
-- **VMware Workstation/Player:** crie uma VM Linux 64 bits, aponte o CD/DVD para a ISO e ative aceleração 3D.
+- **QEMU/KVM (BIOS e UEFI):**
+  `qemu-system-x86_64 -enable-kvm -m 4G -cdrom iso/out/aura-os-*.iso`
+- **VMware Workstation/Player:** crie uma VM Linux 64 bits, aponte o CD/DVD
+  para a ISO e ative aceleração 3D.
+
+O CI inicializa a ISO em QEMU headless e exige que os processos
+`xfce4-session` e `xfdesktop` estejam em execução. Isso protege contra
+regressões no initramfs, no `switch-root` e no login automático, que podem
+gerar uma ISO que compila, mas não chega à área de trabalho.
+
+## Estrutura
+
+- `aura-dl/`: núcleo e CLI do downloader, escritos em Rust.
+- `browser/aura-dl-bridge/`: extensão e host de mensagens nativas.
+- `packages/`: PKGBUILDs e repositório local usados no build da ISO.
+- `iso/`: perfil archiso, script de customização e entradas de boot.
 
 ## Decisões técnicas
 
-- **Base:** perfil `releng` do archiso, copiado e adaptado. Evita erros de estrutura de um perfil do zero.
-- **Pacotes:** apenas repositórios oficiais (`core`, `extra`, `multilib`). Pacotes do AUR não entram na ISO, só no pós-instalação.
-- **Senha da live:** `aura`, temporária. Deve ser trocada no instalador ou no primeiro boot.
-- **Sudo na live:** `NOPASSWD` apenas para o grupo `wheel`, somente na live. A regra deve ser removida no sistema instalado.
-- **Reprodutibilidade:** a versão e o label da ISO derivam de `SOURCE_DATE_EPOCH`. No CI, esse valor vem da data do último commit.
+- **Base:** perfil `releng` do archiso, copiado e adaptado. Evita erros de
+  estrutura de um perfil do zero.
+- **Pacotes oficiais:** tudo que está em `core`, `extra` ou `multilib` vem dos
+  repositórios oficiais. Pacotes próprios usam o repositório local `[aura]`.
+- **Senha da live:** `aura`, temporária. Deve ser trocada no instalador ou no
+  primeiro boot.
+- **Sudo na live:** `NOPASSWD` apenas para o grupo `wheel`, somente na live. A
+  regra deve ser removida no sistema instalado.
+- **Reprodutibilidade:** a versão e o label da ISO derivam de
+  `SOURCE_DATE_EPOCH`. No CI, esse valor vem da data do último commit.
 
 ## Limitações conhecidas
 
-- Os nomes de pacotes em `iso/packages.x86_64` foram conferidos de memória, não com `pacman -Si` em um host Arch. Confirme antes do primeiro build.
-- `polkit-gnome` pode ter sido movido do repositório oficial. Se o build falhar por esse pacote, substitua por `polkit-kde-agent` ou remova.
-- Este commit ainda não foi testado com um build real. O primeiro build vai revelar erros de pacote.
-- Apps libadwaita (GTK4) ignoram o tema GTK comum. Será documentado junto com o tema.
-- LibreWolf fica de fora da ISO por ser do AUR.
+- A extensão do navegador ainda não é assinada pelo Mozilla; no Firefox
+  release ela precisa ser carregada temporariamente em `about:debugging`.
+- O `aura-dl` oferece somente a CLI; não há interface gráfica, fila,
+  cancelamento nem histórico.
+- Ainda não existe instalador; a ISO é uma live.
+- Aplicativos libadwaita (GTK4) ignoram o tema GTK comum.
 
 ## Licença
 

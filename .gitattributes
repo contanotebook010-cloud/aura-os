@@ -3,7 +3,7 @@
 iso/airootfs/**/*.sh text eol=lf
 iso/airootfs/usr/local/bin/aura-first-boot text eol=lf
 iso/airootfs/usr/local/bin/aura-session-ready text eol=lf
-iso/airootfs/usr/local/bin/aura-dl-host text eol=lf
 iso/airootfs/etc/systemd/system/*.service text eol=lf
 iso/airootfs/etc/systemd/system/*.timer text eol=lf
 *.yml text eol=lf
+PKGBUILD text eol=lf

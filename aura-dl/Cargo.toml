@@ -19,6 +19,7 @@ anyhow = "1"
 url = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+directories = "6"
 
 [profile.release]
 # LTO e um codegen por vez: binário menor, relevante para a ISO.

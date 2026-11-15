@@ -1,0 +1,30 @@
+# Maintainer: Aura do Sigma <aura@aura-os.local>
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=aura-dl
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Downloader de vídeo e áudio do Aura OS, em torno do yt-dlp e do ffmpeg"
+arch=('x86_64')
+url="https://github.com/contanotebook010-cloud/aura-os"
+license=('MIT')
+depends=('gcc-libs' 'yt-dlp' 'ffmpeg')
+makedepends=('cargo' 'rust')
+source=("aura-dl-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "${srcdir}/aura-dl-${pkgver}" || exit 1
+  CARGO_INCREMENTAL=0 cargo build --release --locked
+}
+
+check() {
+  cd "${srcdir}/aura-dl-${pkgver}" || exit 1
+  CARGO_INCREMENTAL=0 cargo test --locked
+}
+
+package() {
+  cd "${srcdir}/aura-dl-${pkgver}" || exit 1
+  install -Dm755 target/release/aura-dl "${pkgdir}/usr/bin/aura-dl"
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

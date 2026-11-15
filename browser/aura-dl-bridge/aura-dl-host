@@ -15,6 +15,8 @@ import sys
 from urllib.parse import urlparse
 
 AURA_DL = "aura-dl"
+MAX_MESSAGE_BYTES = 1024 * 1024
+DOWNLOAD_TIMEOUT_SECONDS = 60 * 60 * 6
 ALLOWED_MODES = {"video", "audio"}
 ALLOWED_CONTAINERS = {
     "video": {"mp4", "mkv", "webm"},
@@ -22,42 +24,86 @@ ALLOWED_CONTAINERS = {
 }
 
 
-def read_message():
+def read_exact(stream, size):
+    """Lê exatamente size bytes ou falha se o pipe for encerrado antes."""
+    data = stream.read(size)
+    if len(data) != size:
+        raise ValueError("mensagem nativa incompleta")
+    return data
+
+
+def read_message(stream=None):
     """Lê uma mensagem do navegador. Retorna None quando o navegador fecha o pipe."""
-    raw_length = sys.stdin.buffer.read(4)
-    if len(raw_length) < 4:
+    if stream is None:
+        stream = sys.stdin.buffer
+
+    raw_length = stream.read(4)
+    if not raw_length:
         return None
+    if len(raw_length) != 4:
+        raise ValueError("tamanho de mensagem inválido")
+
     (length,) = struct.unpack("<I", raw_length)
     # Limite de 1 MiB: o Firefox já limita, mas não confiamos no tamanho declarado.
-    if length > 1024 * 1024:
+    if length > MAX_MESSAGE_BYTES:
         raise ValueError("mensagem maior que 1 MiB")
-    return json.loads(sys.stdin.buffer.read(length).decode("utf-8"))
+
+    payload = read_exact(stream, length)
+    message = json.loads(payload.decode("utf-8"))
+    if not isinstance(message, dict):
+        raise ValueError("a mensagem precisa ser um objeto JSON")
+    return message
 
 
-def send_message(payload):
+def send_message(payload, stream=None):
     """Envia uma resposta JSON de volta ao navegador."""
-    data = json.dumps(payload).encode("utf-8")
-    sys.stdout.buffer.write(struct.pack("<I", len(data)))
-    sys.stdout.buffer.write(data)
-    sys.stdout.buffer.flush()
+    if stream is None:
+        stream = sys.stdout.buffer
+
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    stream.write(struct.pack("<I", len(data)))
+    stream.write(data)
+    stream.flush()
 
 
 def validate(message):
     """Confere URL, modo e formato antes de qualquer subprocesso."""
-    url = str(message.get("url", "")).strip()
-    parsed = urlparse(url)
+    if not isinstance(message, dict):
+        return None, "mensagem inválida"
+
+    raw_url = message.get("url")
+    if not isinstance(raw_url, str):
+        return None, "URL ausente ou inválida"
+
+    url = raw_url.strip()
+    if any(ord(character) < 32 for character in url):
+        return None, "URL contém caracteres de controle"
+
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None, "URL inválida"
+
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return None, "URL precisa ser http ou https"
+    if parsed.username is not None or parsed.password is not None:
+        return None, "URL não deve conter credenciais"
 
     mode = message.get("mode", "video")
-    if mode not in ALLOWED_MODES:
+    if not isinstance(mode, str) or mode not in ALLOWED_MODES:
         return None, f"modo inválido: {mode}"
 
     container = message.get("container", "mp4" if mode == "video" else "mp3")
-    if container not in ALLOWED_CONTAINERS[mode]:
+    if not isinstance(container, str) or container not in ALLOWED_CONTAINERS[mode]:
         return None, f"formato inválido para {mode}: {container}"
 
-    quality = int(message.get("quality", 1080))
+    raw_quality = message.get("quality", 1080)
+    if isinstance(raw_quality, bool):
+        return None, "qualidade fora da faixa 144 a 4320"
+    try:
+        quality = int(raw_quality)
+    except (TypeError, ValueError):
+        return None, "qualidade fora da faixa 144 a 4320"
     if not 144 <= quality <= 4320:
         return None, "qualidade fora da faixa 144 a 4320"
 
@@ -82,16 +128,35 @@ def run_download(options):
         str(options["quality"]),
     ]
     # Sem shell=True: a URL é um argumento, nunca parte de um comando de shell.
-    result = subprocess.run(args, capture_output=True, text=True, timeout=60 * 60 * 6)
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=DOWNLOAD_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "o download excedeu o tempo limite"}
+    except OSError as error:
+        return {"ok": False, "error": f"não consegui executar o aura-dl: {error}"}
+
     if result.returncode != 0:
-        return {"ok": False, "error": result.stderr.strip()[-500:] or "falha desconhecida"}
+        error = result.stderr.strip()[-500:] or "falha desconhecida"
+        return {"ok": False, "error": error}
     return {"ok": True}
 
 
 def main():
-    message = read_message()
+    try:
+        message = read_message()
+    except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        send_message({"ok": False, "error": str(error)})
+        return
+
     if message is None:
         return
+
     options, error = validate(message)
     if error:
         send_message({"ok": False, "error": error})

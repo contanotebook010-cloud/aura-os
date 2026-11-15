@@ -7,6 +7,7 @@ use anyhow::{bail, Context, Result};
 use aura_dl::backend::{self, DownloadRequest, Mode};
 use aura_dl::input;
 use clap::{Parser, ValueEnum};
+use directories::UserDirs;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -38,8 +39,10 @@ struct Cli {
     mode: ModeArg,
 
     /// Formato de saída: mp4, mkv, webm para vídeo; mp3, m4a, opus para áudio
-    #[arg(long, default_value = "mp4")]
-    format: String,
+    ///
+    /// O padrão é mp4 no modo vídeo e mp3 no modo áudio.
+    #[arg(long)]
+    format: Option<String>,
 
     /// Altura máxima do vídeo em pixels
     #[arg(long, default_value_t = 1080)]
@@ -51,13 +54,10 @@ struct Cli {
 }
 
 fn default_download_dir() -> PathBuf {
-    if let Some(dir) = std::env::var_os("XDG_DOWNLOAD_DIR") {
-        return PathBuf::from(dir);
-    }
-    let home = std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default();
-    home.join("Downloads")
+    UserDirs::new()
+        .and_then(|dirs| dirs.download_dir().map(PathBuf::from))
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join("Downloads")))
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn main() -> Result<()> {
@@ -105,10 +105,13 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&out_dir)
         .with_context(|| format!("não consegui criar a pasta {}", out_dir.display()))?;
 
+    let container = cli
+        .format
+        .unwrap_or_else(|| backend::default_container(mode).to_owned());
     let request = DownloadRequest {
         url: url.to_owned(),
         mode,
-        container: cli.format,
+        container,
         max_height: cli.quality,
     };
     let args = backend::build_download_args(&request, &backend::output_template(&out_dir))?;

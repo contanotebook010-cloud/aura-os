@@ -7,6 +7,8 @@ set -euo pipefail
 # dentro da substituição de comando seria mascarado (SC2155).
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+readonly REPO_ROOT
 readonly WORK_DIR="${SCRIPT_DIR}/work"
 readonly OUT_DIR="${SCRIPT_DIR}/out"
 
@@ -19,6 +21,10 @@ if ! command -v mkarchiso >/dev/null 2>&1; then
   echo "erro: mkarchiso não encontrado. Instale com: pacman -S archiso" >&2
   exit 1
 fi
+
+# Monta os pacotes que não existem nos repositórios oficiais. O pacman.conf do
+# perfil consome o banco fixo em /tmp/aura-os-repo durante a criação da imagem.
+bash "${REPO_ROOT}/packages/build-local-repo.sh"
 
 # Limpa o diretório de trabalho anterior. Um build parcial deixado para trás
 # pode misturar pacotes antigos com novos e gerar uma ISO inconsistente.

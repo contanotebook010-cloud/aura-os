@@ -32,6 +32,14 @@ pub struct DownloadRequest {
     pub max_height: u32,
 }
 
+/// Formato padrão para cada modo. A CLI usa isso quando `--format` é omitido.
+pub fn default_container(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Video => "mp4",
+        Mode::Audio => "mp3",
+    }
+}
+
 /// Confere se o contêiner ou formato de áudio pedido é suportado no modo escolhido.
 pub fn validate_container(mode: Mode, container: &str) -> Result<()> {
     let allowed = match mode {
@@ -45,13 +53,27 @@ pub fn validate_container(mode: Mode, container: &str) -> Result<()> {
     }
 }
 
+/// Confere se a altura pedida está na faixa aceita pelo downloader.
+pub fn validate_quality(max_height: u32) -> Result<()> {
+    if (144..=4320).contains(&max_height) {
+        Ok(())
+    } else {
+        Err(Error::InvalidQuality(max_height))
+    }
+}
+
 /// Monta os argumentos do yt-dlp para um download. A URL vai por último e a
 /// saída é controlada pelo `out_template`, que o yt-dlp preenche com o título.
 pub fn build_download_args(req: &DownloadRequest, out_template: &str) -> Result<Vec<String>> {
     validate_container(req.mode, &req.container)?;
+    validate_quality(req.max_height)?;
 
     let mut args: Vec<String> = vec![
         "--no-playlist".into(),
+        // Nunca substitui um download existente, mesmo se o id do vídeo repetir.
+        "--no-overwrites".into(),
+        // Mantém o título portátil para sistemas de arquivos Windows.
+        "--windows-filenames".into(),
         // Uma linha por atualização de progresso, para lermos de forma incremental.
         "--newline".into(),
         "--progress-template".into(),

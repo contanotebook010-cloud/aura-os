@@ -1,6 +1,6 @@
-# Lista de pacotes da ISO. Somente repositórios oficiais (core, extra, multilib).
-# Os nomes dos pacotes são validados pelo build real da ISO no CI.
-# Pacotes do AUR não entram aqui.
+# Lista de pacotes da ISO. Os repositórios oficiais são core, extra e multilib.
+# Os pacotes aura-dl e aura-dl-bridge vêm do repositório local [aura], criado
+# por packages/build-local-repo.sh antes do build da imagem.
 
 # --- Base ---
 base
@@ -77,5 +77,6 @@ fastfetch
 syslinux
 systemd
 
-# --- Ponte do navegador (host nativo do aura-dl) ---
-python
+# --- Aplicativos próprios do Aura OS ---
+aura-dl
+aura-dl-bridge

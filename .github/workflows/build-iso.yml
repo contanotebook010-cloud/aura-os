@@ -41,6 +41,10 @@ jobs:
       - name: Testes
         run: cargo test --locked
 
+      - name: Testes da ponte do navegador
+        working-directory: browser/aura-dl-bridge
+        run: python3 -m unittest discover -s tests -v
+
   iso:
     name: build da ISO
     runs-on: ubuntu-latest
@@ -59,13 +63,22 @@ jobs:
           pacman -Syu --noconfirm archlinux-keyring
 
       - name: Instalar dependências de build
-        run: pacman -S --noconfirm --needed archiso shellcheck git
+        run: pacman -S --noconfirm --needed archiso base-devel git libarchive rust shellcheck
 
       - uses: actions/checkout@v4
 
       - name: Lint dos scripts de shell
         # O host nativo é Python e não entra aqui: shellcheck só analisa shell.
-        run: shellcheck iso/build.sh iso/profiledef.sh iso/airootfs/root/customize_airootfs.sh iso/airootfs/usr/local/bin/aura-first-boot
+        run: |
+          shellcheck \
+            iso/build.sh \
+            iso/profiledef.sh \
+            iso/airootfs/root/customize_airootfs.sh \
+            iso/airootfs/usr/local/bin/aura-first-boot \
+            iso/airootfs/usr/local/bin/aura-session-ready \
+            packages/build-local-repo.sh \
+            packages/aura-dl/PKGBUILD \
+            packages/aura-dl-bridge/PKGBUILD
 
       - name: Construir a ISO
         working-directory: iso

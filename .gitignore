@@ -5,3 +5,7 @@ iso/out/
 
 # Build do Rust
 aura-dl/target/
+
+# Python
+__pycache__/
+*.py[cod]

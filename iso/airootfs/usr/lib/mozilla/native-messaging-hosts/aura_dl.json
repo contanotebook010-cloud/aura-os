@@ -1,7 +1,0 @@
-{
-  "name": "aura_dl",
-  "description": "Ponte entre a extensão do navegador e o aura-dl",
-  "path": "/usr/local/bin/aura-dl-host",
-  "type": "stdio",
-  "allowed_extensions": ["aura-dl@aura-os.local"]
-}

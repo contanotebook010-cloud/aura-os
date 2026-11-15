@@ -5,6 +5,7 @@ Downloader de vídeo e áudio do Aura OS. Usa o **yt-dlp** para extrair e o **ff
 ## Estado atual
 
 - **Pronto:** núcleo (validação de URL, nomes de arquivo seguros, metadados, argumentos do yt-dlp, leitura de progresso) e CLI com `--cli`, `--list`, `--mode`, `--format`, `--quality` e `--out`.
+- **Na ISO:** o binário é empacotado por `packages/aura-dl/PKGBUILD` e instalado em `/usr/bin/aura-dl`.
 - **Não existe ainda:** interface gráfica GTK4 + libadwaita, fila de downloads, cancelamento, histórico em SQLite, arquivo de configuração TOML e notificações.
 
 ## Uso
@@ -39,4 +40,4 @@ Os testes não precisam de rede nem do yt-dlp instalado. A saída de metadados v
 
 - Os testes rodam no CI (Linux), não no notebook Windows, porque o Windows precisa do MSVC Build Tools para linkar.
 - Cancelamento de download ainda não está implementado.
-- O `aura-dl` não entra na ISO até existir um PKGBUILD e o repositório local `[aura]`.
+- Na ISO, o downloader usa somente a CLI; a ponte do navegador depende de uma extensão temporária até que ela seja assinada pelo Mozilla.

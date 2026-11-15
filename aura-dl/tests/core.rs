@@ -5,8 +5,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use aura_dl::backend::{
-    build_download_args, parse_metadata, parse_progress_line, validate_container, DownloadRequest,
-    Mode,
+    build_download_args, default_container, parse_metadata, parse_progress_line,
+    validate_container, validate_quality, DownloadRequest, Mode,
 };
 use aura_dl::input::{sanitize_filename, unique_path, validate_url};
 use aura_dl::Error;
@@ -139,6 +139,23 @@ fn recusa_contenior_do_modo_errado() {
     assert!(matches!(
         validate_container(Mode::Video, "mp3"),
         Err(Error::UnsupportedFormat(_))
+    ));
+}
+
+#[test]
+fn formato_padrao_depende_do_modo() {
+    assert_eq!(default_container(Mode::Video), "mp4");
+    assert_eq!(default_container(Mode::Audio), "mp3");
+}
+
+#[test]
+fn recusa_qualidade_fora_da_faixa() {
+    assert!(validate_quality(144).is_ok());
+    assert!(validate_quality(4320).is_ok());
+    assert!(matches!(validate_quality(0), Err(Error::InvalidQuality(0))));
+    assert!(matches!(
+        validate_quality(4321),
+        Err(Error::InvalidQuality(4321))
     ));
 }
 
