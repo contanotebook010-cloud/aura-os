@@ -1,42 +1,139 @@
 #!/usr/bin/env bash
 # Verifica periodicamente se a sessão XFCE da live foi realmente iniciada.
 #
-# O LightDM pode announce que iniciou mesmo quando o login automático falha.
-# Este verificador exige os processos xfce4-session e xfdesktop do usuário
-# da live e publica um marcador inequívoco no console serial.
+# O LightDM pode anunciar que iniciou mesmo quando o login automático falha.
+# Este verificador exige:
+#   1. os processos xfce4-session e xfdesktop do usuário da live;
+#   2. uma sessão X11 ativa do mesmo usuário no systemd-logind.
+#
+# O marcador final só é publicado depois que todas as condições são satisfeitas.
 set -euo pipefail
 
 readonly LIVE_USER="aura"
 readonly STATE_DIR="/run/aura"
 readonly ATTEMPT_FILE="${STATE_DIR}/session-check.attempts"
-readonly READY_FILE="${STATE_DIR}/xfce-session-ready"
-readonly FAILED_FILE="${STATE_DIR}/xfce-session-failed"
+readonly READY_FILE="${STATE_DIR}/xfce-smoke-ok"
+readonly FAILED_FILE="${STATE_DIR}/xfce-smoke-failed"
 readonly MAX_ATTEMPTS=60
+readonly SERIAL_DEVICE="/dev/ttyS0"
 
 emit_marker() {
   local marker="$1"
 
   logger --tag aura-session-ready -- "${marker}" || true
-  if [[ -c /dev/ttyS0 ]]; then
-    printf '%s\n' "${marker}" > /dev/ttyS0 || true
+  if [[ -c "${SERIAL_DEVICE}" ]]; then
+    printf '%s\n' "${marker}" > "${SERIAL_DEVICE}" || true
   fi
+}
+
+stop_timer() {
+  systemctl --no-block stop aura-session-ready.timer || true
+}
+
+active_graphical_session() {
+  local sessions
+  local sid
+  local state
+  local name
+  local session_type
+  local -a session_ids=()
+
+  sessions="$(
+    loginctl show-user "${LIVE_USER}" \
+      -p Sessions --value 2>/dev/null || true
+  )"
+  read -r -a session_ids <<< "${sessions}" || true
+
+  for sid in "${session_ids[@]}"; do
+    [[ -n "${sid}" ]] || continue
+
+    state="$(
+      loginctl show-session "${sid}" \
+        -p State --value 2>/dev/null || true
+    )"
+    name="$(
+      loginctl show-session "${sid}" \
+        -p Name --value 2>/dev/null || true
+    )"
+    session_type="$(
+      loginctl show-session "${sid}" \
+        -p Type --value 2>/dev/null || true
+    )"
+
+    if [[ "${state}" == "active" \
+      && "${name}" == "${LIVE_USER}" \
+      && "${session_type}" == "x11" ]]; then
+      printf '%s\n' "${sid}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+smoke_ready() {
+  pgrep -u "${LIVE_USER}" -x xfce4-session >/dev/null 2>&1 || return 1
+  pgrep -u "${LIVE_USER}" -x xfdesktop >/dev/null 2>&1 || return 1
+  active_graphical_session >/dev/null
+}
+
+dump_diagnostics() {
+  local uid
+
+  [[ -c "${SERIAL_DEVICE}" ]] || return 0
+  uid="$(id -u "${LIVE_USER}" 2>/dev/null || printf 'unknown')"
+
+  {
+    printf '\n===== AURA_XFCE_SMOKE_DIAGNOSTICS =====\n'
+
+    printf '%s\n' '--- id aura ---'
+    id "${LIVE_USER}" 2>&1 || true
+
+    printf '%s\n' '--- grupos de aura ---'
+    id -nG "${LIVE_USER}" 2>&1 || true
+
+    printf '%s\n' '--- grupo autologin ---'
+    getent group autologin 2>&1 || true
+
+    printf '%s\n' '--- configuração efetiva do LightDM ---'
+    lightdm --show-config 2>&1 || true
+
+    printf '%s\n' '--- sessões do systemd-logind ---'
+    loginctl list-sessions --no-pager 2>&1 || true
+
+    printf '%s\n' '--- sessões de aura ---'
+    loginctl show-user "${LIVE_USER}" 2>&1 || true
+
+    printf '%s\n' '--- processos XFCE de aura ---'
+    pgrep -a -u "${LIVE_USER}" -x xfce4-session 2>&1 || true
+    pgrep -a -u "${LIVE_USER}" -x xfdesktop 2>&1 || true
+
+    printf '%s\n' '--- journal do LightDM ---'
+    journalctl -b --no-pager -u lightdm.service -n 300 2>&1 || true
+
+    printf '%s\n' '--- journal do usuário aura ---'
+    journalctl -b --no-pager "_UID=${uid}" -n 300 2>&1 || true
+
+    printf '%s\n' '===== END AURA_XFCE_SMOKE_DIAGNOSTICS =====\n'
+  } > "${SERIAL_DEVICE}" 2>&1 || true
 }
 
 mkdir -p "${STATE_DIR}"
 
 if [[ -f "${READY_FILE}" ]]; then
+  stop_timer
   exit 0
 fi
 
 if [[ -f "${FAILED_FILE}" ]]; then
+  stop_timer
   exit 1
 fi
 
-if pgrep -u "${LIVE_USER}" -x xfce4-session >/dev/null 2>&1 \
-  && pgrep -u "${LIVE_USER}" -x xfdesktop >/dev/null 2>&1; then
-  printf 'ready\n' > "${READY_FILE}"
-  emit_marker "AURA_XFCE_SESSION_READY"
-  systemctl --no-block stop aura-session-ready.timer
+if smoke_ready; then
+  printf 'ok\n' > "${READY_FILE}"
+  emit_marker "AURA_XFCE_SMOKE_OK"
+  stop_timer
   exit 0
 fi
 
@@ -52,8 +149,9 @@ printf '%s\n' "${attempts}" > "${ATTEMPT_FILE}"
 
 if ((attempts >= MAX_ATTEMPTS)); then
   printf 'failed\n' > "${FAILED_FILE}"
-  emit_marker "AURA_XFCE_SESSION_FAILED"
-  systemctl --no-block stop aura-session-ready.timer
+  dump_diagnostics
+  emit_marker "AURA_XFCE_SMOKE_FAILED"
+  stop_timer
   exit 1
 fi
 

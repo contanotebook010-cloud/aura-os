@@ -48,10 +48,12 @@ gravado na árvore do repositório.
 - **VMware Workstation/Player:** crie uma VM Linux 64 bits, aponte o CD/DVD
   para a ISO e ative aceleração 3D.
 
-O CI inicializa a ISO em QEMU headless e exige que os processos
-`xfce4-session` e `xfdesktop` estejam em execução. Isso protege contra
-regressões no initramfs, no `switch-root` e no login automático, que podem
-gerar uma ISO que compila, mas não chega à área de trabalho.
+O CI inicializa a ISO em QEMU headless e só a aprova quando os processos
+`xfce4-session` e `xfdesktop` estão em execução e o `systemd-logind`
+registra uma sessão X11 ativa do usuário `aura`. O guest publica o marcador
+`AURA_XFCE_SMOKE_OK` apenas depois dessas três verificações. Isso protege
+contra regressões no initramfs, no `switch-root` e no login automático, que
+podem gerar uma ISO que compila, mas não chega à área de trabalho.
 
 ## Estrutura
 

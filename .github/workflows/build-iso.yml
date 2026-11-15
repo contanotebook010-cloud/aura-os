@@ -128,11 +128,12 @@ jobs:
             > boot.log 2>&1 &
           qemu_pid=$!
 
-          # A imagem publica AURA_XFCE_SESSION_READY somente quando os
-          # processos xfce4-session e xfdesktop já estão em execução.
-          deadline=$((SECONDS + 720))
+          # A imagem publica AURA_XFCE_SMOKE_OK somente quando os processos
+          # xfce4-session/xfdesktop e uma sessão X11 ativa do logind existem.
+          deadline=$((SECONDS + 600))
           while ((SECONDS < deadline)); do
-            if grep -Eq 'AURA_XFCE_SESSION_(READY|FAILED)' boot.log; then
+            if grep -Fq 'AURA_XFCE_SMOKE_OK' boot.log \
+              || grep -Fq 'AURA_XFCE_SMOKE_FAILED' boot.log; then
               break
             fi
             if ! kill -0 "${qemu_pid}" 2>/dev/null; then
@@ -159,17 +160,23 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Eq 'Started Light Display Manager|Reached target Graphical Interface|login:' boot.clean.log; then
-            echo "erro: a live não chegou ao gerenciador gráfico (qemu status ${status})" >&2
+          if grep -Fq 'AURA_XFCE_SMOKE_FAILED' boot.clean.log; then
+            echo "erro: a sessão XFCE não satisfaz o smoke test (qemu status ${status})" >&2
             exit 1
           fi
 
-          if grep -Fq 'AURA_XFCE_SESSION_FAILED' boot.clean.log; then
-            echo "erro: a sessão XFCE não foi iniciada" >&2
+          if ! grep -Fq 'AURA_XFCE_SMOKE_OK' boot.clean.log; then
+            echo "erro: timeout sem AURA_XFCE_SMOKE_OK (qemu status ${status})" >&2
             exit 1
           fi
 
-          if ! grep -Fq 'AURA_XFCE_SESSION_READY' boot.clean.log; then
-            echo "erro: a live não inicializou xfce4-session/xfdesktop (qemu status ${status})" >&2
-            exit 1
-          fi
+      - name: Enviar os logs do smoke test
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-os-boot-smoke-logs
+          path: |
+            boot.log
+            boot.clean.log
+          if-no-files-found: warn
+          retention-days: 7
