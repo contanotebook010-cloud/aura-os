@@ -69,7 +69,16 @@ jobs:
 
       - name: Lint dos scripts de shell
         # O host nativo é Python e não entra aqui: shellcheck só analisa shell.
-        run: shellcheck iso/build.sh iso/profiledef.sh iso/airootfs/root/customize_airootfs.sh iso/airootfs/usr/local/bin/aura-first-boot packages/build-local-repo.sh packages/aura-dl/PKGBUILD packages/aura-dl-bridge/PKGBUILD
+        run: |
+          shellcheck \
+            iso/build.sh \
+            iso/profiledef.sh \
+            iso/airootfs/root/customize_airootfs.sh \
+            iso/airootfs/usr/local/bin/aura-first-boot \
+            iso/airootfs/usr/local/bin/aura-session-ready \
+            packages/build-local-repo.sh \
+            packages/aura-dl/PKGBUILD \
+            packages/aura-dl-bridge/PKGBUILD
 
       - name: Construir a ISO
         working-directory: iso
@@ -101,23 +110,45 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86
 
-      - name: Iniciar a live em modo headless
+      - name: Iniciar a live e validar a sessão XFCE
         run: |
           iso="$(find iso/out -maxdepth 1 -type f -name '*.iso' -print -quit)"
           test -n "${iso}"
 
-          set +e
-          timeout --signal=TERM 300 \
-            qemu-system-x86_64 \
-              -machine accel=tcg \
-              -m 2048 -smp 2 \
-              -display none \
-              -serial stdio \
-              -cdrom "${iso}" \
-              -boot d \
-              > boot.log 2>&1
-          status=$?
-          set -e
+          qemu-system-x86_64 \
+            -machine accel=tcg \
+            -m 2048 -smp 2 \
+            -display none \
+            -vga std \
+            -monitor none \
+            -serial stdio \
+            -cdrom "${iso}" \
+            -boot d \
+            -no-reboot \
+            > boot.log 2>&1 &
+          qemu_pid=$!
+
+          # A imagem publica AURA_XFCE_SESSION_READY somente quando os
+          # processos xfce4-session e xfdesktop já estão em execução.
+          deadline=$((SECONDS + 720))
+          while ((SECONDS < deadline)); do
+            if grep -Eq 'AURA_XFCE_SESSION_(READY|FAILED)' boot.log; then
+              break
+            fi
+            if ! kill -0 "${qemu_pid}" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          if kill -0 "${qemu_pid}" 2>/dev/null; then
+            kill -TERM "${qemu_pid}"
+          fi
+          if wait "${qemu_pid}"; then
+            status=0
+          else
+            status=$?
+          fi
 
           # O systemd colore a saída; removemos ANSI antes de procurar os marcos.
           sed -E 's/\x1B\[[0-9;?]*[ -\/]*[@-~]//g' boot.log > boot.clean.log
@@ -130,5 +161,15 @@ jobs:
 
           if ! grep -Eq 'Started Light Display Manager|Reached target Graphical Interface|login:' boot.clean.log; then
             echo "erro: a live não chegou ao gerenciador gráfico (qemu status ${status})" >&2
+            exit 1
+          fi
+
+          if grep -Fq 'AURA_XFCE_SESSION_FAILED' boot.clean.log; then
+            echo "erro: a sessão XFCE não foi iniciada" >&2
+            exit 1
+          fi
+
+          if ! grep -Fq 'AURA_XFCE_SESSION_READY' boot.clean.log; then
+            echo "erro: a live não inicializou xfce4-session/xfdesktop (qemu status ${status})" >&2
             exit 1
           fi

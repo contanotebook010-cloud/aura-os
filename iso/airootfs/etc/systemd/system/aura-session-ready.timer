@@ -1,0 +1,11 @@
+[Unit]
+Description=Verifica periodicamente a inicialização da sessão XFCE
+
+[Timer]
+OnBootSec=10s
+OnUnitInactiveSec=5s
+AccuracySec=1s
+Unit=aura-session-ready.service
+
+[Install]
+WantedBy=timers.target
