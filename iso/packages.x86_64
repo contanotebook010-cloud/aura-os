@@ -32,6 +32,10 @@ open-vm-tools
 
 # --- Desktop ---
 xfce4
+# Componentes críticos também são explícitos: a sessão não pode depender
+# apenas da seleção automática do grupo xfce4.
+xfce4-session
+xfdesktop
 xfce4-goodies
 lightdm
 lightdm-gtk-greeter

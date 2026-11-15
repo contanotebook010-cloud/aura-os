@@ -13,6 +13,13 @@ if ! id -u "${LIVE_USER}" >/dev/null 2>&1; then
 fi
 echo "${LIVE_USER}:${LIVE_PASSWORD}" | chpasswd
 
+# O LightDM exige que o usuário do autologin pertença ao grupo autologin.
+# Sem essa associação, o daemon sobe, mas nenhuma sessão XFCE é aberta.
+if ! getent group autologin >/dev/null; then
+  groupadd --system autologin
+fi
+usermod --append --groups autologin "${LIVE_USER}"
+
 # NOPASSWD só na live. Esta regra deve ser removida no sistema instalado.
 install -d -m 0750 /etc/sudoers.d
 printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/10-aura-live
@@ -30,11 +37,20 @@ systemctl enable NetworkManager.service
 systemctl enable lightdm.service
 systemctl enable bluetooth.service
 systemctl enable vmtoolsd.service
+systemctl enable aura-session-ready.timer
 
 # Autologin no XFCE para a live. Não é configurado no sistema instalado.
+# session-wrapper e user-session são explícitos para evitar a tela de login
+# infinita quando a sessão XFCE não está disponível.
 install -d -m 0755 /etc/lightdm
 cat > /etc/lightdm/lightdm.conf <<'EOF'
+[LightDM]
+logind-check-graphical=false
+
 [Seat:*]
+greeter-session=lightdm-gtk-greeter
+user-session=xfce
+session-wrapper=/etc/lightdm/Xsession
 autologin-user=aura
 autologin-user-timeout=0
 autologin-session=xfce
