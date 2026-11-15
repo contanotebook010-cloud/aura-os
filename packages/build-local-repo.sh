@@ -106,7 +106,13 @@ build_package() {
   fi
 
   local package_file
-  package_file="$(find "${build_dir}" -maxdepth 1 -type f -name '*.pkg.tar.*' -print -quit)"
+  # O makepkg também pode gerar um pacote -debug. O repositório da ISO usa
+  # somente o pacote principal; sem este filtro, a busca poderia validar o
+  # pacote de depuração e declarar ausente o binário público.
+  package_file="$(find "${build_dir}" -maxdepth 1 -type f \
+    -name "${package_name}-*.pkg.tar.*" \
+    ! -name "${package_name}-debug-*.pkg.tar.*" \
+    -print -quit)"
   [[ -n "${package_file}" ]] || fail "makepkg não gerou um pacote para ${package_name}"
   cp -- "${package_file}" "${LOCAL_REPO}/"
 
