@@ -16,6 +16,9 @@ pub enum Error {
     #[error("formato de saída não suportado: {0}")]
     UnsupportedFormat(String),
 
+    #[error("qualidade fora da faixa 144 a 4320: {0}")]
+    InvalidQuality(u32),
+
     #[error("yt-dlp não encontrado no PATH. Instale com: sudo pacman -S yt-dlp")]
     MissingYtDlp,
 

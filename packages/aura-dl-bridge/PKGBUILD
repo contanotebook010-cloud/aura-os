@@ -1,0 +1,35 @@
+# Maintainer: Aura do Sigma <aura@aura-os.local>
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=aura-dl-bridge
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Ponte de mensagens nativas entre Firefox/LibreWolf e o aura-dl"
+arch=('any')
+url="https://github.com/contanotebook010-cloud/aura-os"
+license=('MIT')
+depends=('python' 'aura-dl')
+optdepends=(
+  'firefox: navegador com suporte a mensagens nativas'
+  'librewolf: navegador com suporte a mensagens nativas'
+)
+source=("aura-dl-bridge-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd "${srcdir}/aura-dl-bridge-${pkgver}" || exit 1
+
+  install -Dm755 aura-dl-host "${pkgdir}/usr/bin/aura-dl-host"
+  install -Dm644 aura_dl.json \
+    "${pkgdir}/usr/lib/mozilla/native-messaging-hosts/aura_dl.json"
+  install -Dm644 aura_dl.json \
+    "${pkgdir}/usr/lib/librewolf/native-messaging-hosts/aura_dl.json"
+
+  install -Dm644 manifest.json \
+    "${pkgdir}/usr/share/aura-os/aura-dl-bridge/manifest.json"
+  install -Dm644 background.js \
+    "${pkgdir}/usr/share/aura-os/aura-dl-bridge/background.js"
+  install -Dm644 README.md \
+    "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 LICENSE \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

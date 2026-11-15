@@ -2,3 +2,4 @@
 *.sh text eol=lf
 iso/airootfs/**/*.sh text eol=lf
 *.yml text eol=lf
+PKGBUILD text eol=lf
