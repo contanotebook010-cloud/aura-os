@@ -1,0 +1,8 @@
+[Unit]
+Description=Verifica se a sessão XFCE da live foi iniciada
+After=lightdm.service
+Requires=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aura-session-ready

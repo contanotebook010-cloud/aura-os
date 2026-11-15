@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Verifica periodicamente se a sessão XFCE da live foi realmente iniciada.
+#
+# O LightDM pode announce que iniciou mesmo quando o login automático falha.
+# Este verificador exige os processos xfce4-session e xfdesktop do usuário
+# da live e publica um marcador inequívoco no console serial.
+set -euo pipefail
+
+readonly LIVE_USER="aura"
+readonly STATE_DIR="/run/aura"
+readonly ATTEMPT_FILE="${STATE_DIR}/session-check.attempts"
+readonly READY_FILE="${STATE_DIR}/xfce-session-ready"
+readonly FAILED_FILE="${STATE_DIR}/xfce-session-failed"
+readonly MAX_ATTEMPTS=60
+
+emit_marker() {
+  local marker="$1"
+
+  logger --tag aura-session-ready -- "${marker}" || true
+  if [[ -c /dev/ttyS0 ]]; then
+    printf '%s\n' "${marker}" > /dev/ttyS0 || true
+  fi
+}
+
+mkdir -p "${STATE_DIR}"
+
+if [[ -f "${READY_FILE}" ]]; then
+  exit 0
+fi
+
+if [[ -f "${FAILED_FILE}" ]]; then
+  exit 1
+fi
+
+if pgrep -u "${LIVE_USER}" -x xfce4-session >/dev/null 2>&1 \
+  && pgrep -u "${LIVE_USER}" -x xfdesktop >/dev/null 2>&1; then
+  printf 'ready\n' > "${READY_FILE}"
+  emit_marker "AURA_XFCE_SESSION_READY"
+  systemctl --no-block stop aura-session-ready.timer
+  exit 0
+fi
+
+attempts=0
+if [[ -r "${ATTEMPT_FILE}" ]]; then
+  read -r attempts < "${ATTEMPT_FILE}" || attempts=0
+fi
+if ! [[ "${attempts}" =~ ^[0-9]+$ ]]; then
+  attempts=0
+fi
+attempts=$((attempts + 1))
+printf '%s\n' "${attempts}" > "${ATTEMPT_FILE}"
+
+if ((attempts >= MAX_ATTEMPTS)); then
+  printf 'failed\n' > "${FAILED_FILE}"
+  emit_marker "AURA_XFCE_SESSION_FAILED"
+  systemctl --no-block stop aura-session-ready.timer
+  exit 1
+fi
+
+exit 0
