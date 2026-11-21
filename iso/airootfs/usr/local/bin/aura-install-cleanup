@@ -46,7 +46,7 @@ rm -f -- /etc/archiso-release
 # O módulo removeuser já elimina a conta live. Este passo remove somente um
 # home residual e preserva uma conta nova que também se chame aura.
 if ! id -u "${LIVE_USER}" >/dev/null 2>&1; then
-  rm -rf -- "/home/${LIVE_USER}"
+  rm -rf -- "/home/${LIVE_USER:?}"
 fi
 if getent group autologin >/dev/null; then
   groupdel autologin
