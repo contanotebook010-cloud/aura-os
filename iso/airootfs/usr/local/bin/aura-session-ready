@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-# Verifica periodicamente se a sessão XFCE da live foi realmente iniciada.
+# Verifica periodicamente se a live do Aura OS está realmente pronta.
 #
 # O LightDM pode anunciar que iniciou mesmo quando o login automático falha.
 # Este verificador exige:
 #   1. os processos xfce4-session e xfdesktop do usuário da live;
-#   2. uma sessão X11 ativa do mesmo usuário no systemd-logind.
-#
-# O marcador final só é publicado depois que todas as condições são satisfeitas.
+#   2. uma sessão X11 ativa do mesmo usuário no systemd-logind;
+#   3. o preset XFCE clássico aplicado e validado no home da live;
+#   4. o Calamares 3.4.3 instalado, configurado e capaz de abrir a interface.
 set -euo pipefail
 
 readonly LIVE_USER="aura"
+readonly LIVE_HOME="/home/${LIVE_USER}"
 readonly STATE_DIR="/run/aura"
 readonly ATTEMPT_FILE="${STATE_DIR}/session-check.attempts"
 readonly READY_FILE="${STATE_DIR}/xfce-smoke-ok"
+readonly PRESET_READY_FILE="${STATE_DIR}/xfce-preset-ok"
+readonly CALAMARES_READY_FILE="${STATE_DIR}/calamares-ok"
 readonly FAILED_FILE="${STATE_DIR}/xfce-smoke-failed"
 readonly MAX_ATTEMPTS=60
 readonly SERIAL_DEVICE="/dev/ttyS0"
@@ -71,10 +74,54 @@ active_graphical_session() {
   return 1
 }
 
+session_process_environment() {
+  local pid
+  local variable
+  local value
+
+  pid="$(pgrep -u "${LIVE_USER}" -x xfce4-session | head -n 1 || true)"
+  [[ -n "${pid}" ]] || return 1
+  [[ -r "/proc/${pid}/environ" ]] || return 1
+
+  while IFS='=' read -r variable value; do
+    case "${variable}" in
+      DBUS_SESSION_BUS_ADDRESS|XDG_RUNTIME_DIR)
+        printf '%s=%s\n' "${variable}" "${value}"
+        ;;
+    esac
+  done < <(tr '\0' '\n' < "/proc/${pid}/environ")
+}
+
 smoke_ready() {
   pgrep -u "${LIVE_USER}" -x xfce4-session >/dev/null 2>&1 || return 1
   pgrep -u "${LIVE_USER}" -x xfdesktop >/dev/null 2>&1 || return 1
   active_graphical_session >/dev/null
+}
+
+preset_ready() {
+  local environment
+  local variable
+  local -a env_args=(
+    "HOME=${LIVE_HOME}"
+    "USER=${LIVE_USER}"
+    "LOGNAME=${LIVE_USER}"
+    "XDG_CONFIG_HOME=${LIVE_HOME}/.config"
+  )
+
+  environment="$(session_process_environment || true)"
+  if [[ -n "${environment}" ]]; then
+    while IFS= read -r variable; do
+      env_args+=("${variable}")
+    done <<< "${environment}"
+  fi
+
+  runuser -u "${LIVE_USER}" -- env "${env_args[@]}" \
+    /usr/local/bin/aura-validate-xfce-preset --home "${LIVE_HOME}" \
+    >/dev/null 2>&1
+}
+
+calamares_ready() {
+  /usr/local/bin/aura-validate-calamares --gui-smoke >/dev/null 2>&1
 }
 
 dump_diagnostics() {
@@ -108,6 +155,12 @@ dump_diagnostics() {
     pgrep -a -u "${LIVE_USER}" -x xfce4-session 2>&1 || true
     pgrep -a -u "${LIVE_USER}" -x xfdesktop 2>&1 || true
 
+    printf '%s\n' '--- validação do preset ---'
+    preset_ready 2>&1 || true
+
+    printf '%s\n' '--- validação do Calamares ---'
+    calamares_ready 2>&1 || true
+
     printf '%s\n' '--- journal do LightDM ---'
     journalctl -b --no-pager -u lightdm.service -n 300 2>&1 || true
 
@@ -130,8 +183,29 @@ if [[ -f "${FAILED_FILE}" ]]; then
   exit 1
 fi
 
+session_ok=false
+preset_ok=false
+calamares_ok=false
+
 if smoke_ready; then
+  session_ok=true
+  if preset_ready; then
+    preset_ok=true
+  fi
+  if [[ -f "${CALAMARES_READY_FILE}" ]] || calamares_ready; then
+    calamares_ok=true
+    printf 'ok\n' > "${CALAMARES_READY_FILE}"
+  fi
+fi
+
+if [[ "${session_ok}" == true \
+  && "${preset_ok}" == true \
+  && "${calamares_ok}" == true ]]; then
+  printf 'ok\n' > "${PRESET_READY_FILE}"
+  printf 'ok\n' > "${CALAMARES_READY_FILE}"
   printf 'ok\n' > "${READY_FILE}"
+  emit_marker "AURA_XFCE_PRESET_OK"
+  emit_marker "AURA_CALAMARES_OK"
   emit_marker "AURA_XFCE_SMOKE_OK"
   stop_timer
   exit 0
@@ -150,6 +224,12 @@ printf '%s\n' "${attempts}" > "${ATTEMPT_FILE}"
 if ((attempts >= MAX_ATTEMPTS)); then
   printf 'failed\n' > "${FAILED_FILE}"
   dump_diagnostics
+  if [[ "${preset_ok}" != true ]]; then
+    emit_marker "AURA_XFCE_PRESET_FAILED"
+  fi
+  if [[ "${calamares_ok}" != true ]]; then
+    emit_marker "AURA_CALAMARES_FAILED"
+  fi
   emit_marker "AURA_XFCE_SMOKE_FAILED"
   stop_timer
   exit 1

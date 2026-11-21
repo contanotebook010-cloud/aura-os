@@ -1,0 +1,93 @@
+# Maintainer: Aura do Sigma <aura@aura-os.local>
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=calamares
+pkgver=3.4.3
+pkgrel=1
+pkgdesc="Instalador gráfico Calamares 3.4.3 compilado para o Aura OS"
+arch=('x86_64')
+url="https://codeberg.org/Calamares/calamares"
+license=('GPL-3.0-or-later')
+depends=(
+  'kcoreaddons'
+  'kpmcore'
+  'libpwquality'
+  'polkit-qt6'
+  'python'
+  'python-jsonschema'
+  'python-yaml'
+  'qt6-base'
+  'qt6-svg'
+  'yaml-cpp'
+)
+makedepends=(
+  'cmake'
+  'extra-cmake-modules'
+  'libglvnd'
+  'ninja'
+  'python'
+  'qt6-tools'
+  'qt6-translations'
+)
+source=("calamares-${pkgver}.tar.gz::https://codeberg.org/Calamares/calamares/releases/download/v${pkgver}/calamares-${pkgver}.tar.gz")
+sha256sums=('144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18')
+
+build() {
+  local skip_modules=(
+    contextualprocess
+    dracut
+    dracutlukscfg
+    dummycpp
+    dummyprocess
+    dummypython
+    finishedq
+    fsresizer
+    hostinfo
+    initramfs
+    initramfscfg
+    interactiveterminal
+    keyboardq
+    localeq
+    mkinitfs
+    netinstall
+    notesqml
+    oemid
+    openrcdmcryptcfg
+    packagechooser
+    packagechooserq
+    plasmalnf
+    preservefiles
+    services-openrc
+    summaryq
+    tracking
+    usersq
+    welcomeq
+    zfs
+    zfshostid
+  )
+
+  cmake \
+    -S "${srcdir}/calamares-${pkgver}" \
+    -B build \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+    -DWITH_QT6=ON \
+    -DWITH_QML=OFF \
+    -DWITH_PYTHON=ON \
+    -DWITH_PYBIND11=ON \
+    -DINSTALL_POLKIT=ON \
+    -DINSTALL_CONFIG=ON \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_SCHEMA_TESTING=OFF \
+    -DBUILD_CRASH_REPORTING=OFF \
+    -DSKIP_MODULES="${skip_modules[*]}" \
+    -Wno-dev
+
+  cmake --build build --parallel "$(nproc)"
+}
+
+package() {
+  DESTDIR="${pkgdir}" cmake --install build
+}

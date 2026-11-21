@@ -1,0 +1,40 @@
+# Identidade visual original do instalador do Aura OS.
+---
+componentName: aura
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 900px,600px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+  productName: Aura OS
+  shortProductName: Aura
+  version: 1.0
+  shortVersion: 1.0
+  versionedName: Aura OS 1.0
+  shortVersionedName: Aura OS
+  bootloaderEntryName: Aura OS
+  productUrl: https://github.com/contanotebook010-cloud/aura-os
+  supportUrl: https://github.com/contanotebook010-cloud/aura-os/issues
+  knownIssuesUrl: https://github.com/contanotebook010-cloud/aura-os/issues
+  releaseNotesUrl: https://github.com/contanotebook010-cloud/aura-os/releases
+  donateUrl: ""
+
+images:
+  productIcon: aura-os.svg
+  productLogo: aura-os.svg
+  productWelcome: aura-welcome.svg
+
+style:
+  SidebarBackground: "#15182b"
+  SidebarText: "#f4f6ff"
+  SidebarTextCurrent: "#15182b"
+  SidebarBackgroundCurrent: "#67e8f9"
+
+uploadServer:
+  type: none
+  url: ""
+  sizeLimit: -1

@@ -63,6 +63,26 @@ make_source_archive() {
     | gzip -n > "${output}"
 }
 
+download_calamares_source() {
+  local output="$1"
+  local url="https://codeberg.org/Calamares/calamares/releases/download/v3.4.3/calamares-3.4.3.tar.gz"
+  local expected_sha256="144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18"
+  local actual_sha256
+
+  curl \
+    --fail \
+    --location \
+    --proto '=https' \
+    --tlsv1.2 \
+    --retry 3 \
+    --output "${output}" \
+    "${url}"
+
+  actual_sha256="$(sha256sum -- "${output}" | cut -d ' ' -f 1)"
+  [[ "${actual_sha256}" == "${expected_sha256}" ]] \
+    || fail "checksum inesperado do Calamares: ${actual_sha256}"
+}
+
 build_package() {
   local package_name="$1"
   local package_source="$2"
@@ -128,6 +148,7 @@ build_package() {
 }
 
 require_command cargo
+require_command curl
 require_command makepkg
 require_command repo-add
 require_command bsdtar
@@ -158,6 +179,31 @@ make_source_archive \
   "aura-dl-bridge-${BRIDGE_VERSION}" \
   "${WORK_DIR}/aura-dl-bridge-${BRIDGE_VERSION}.tar.gz"
 
+# A configuração do Calamares é um pacote local separado. O source contém
+# somente a árvore /etc, e não o próprio PKGBUILD.
+CALAMARES_CONFIG_SOURCE="${WORK_DIR}/aura-calamares-config-source"
+mkdir -p "${CALAMARES_CONFIG_SOURCE}"
+cp -a -- "${REPO_ROOT}/packages/aura-calamares-config/etc" "${CALAMARES_CONFIG_SOURCE}/"
+make_source_archive \
+  "${CALAMARES_CONFIG_SOURCE}" \
+  "aura-calamares-config-1.0.0" \
+  "${WORK_DIR}/aura-calamares-config-1.0.0.tar.gz"
+
+# O Calamares é compilado a partir do tarball oficial, com checksum fixo.
+download_calamares_source "${WORK_DIR}/calamares-3.4.3.tar.gz"
+
+build_package \
+  "calamares" \
+  "calamares-3.4.3.tar.gz" \
+  "usr/bin/calamares" \
+  "usr/lib/calamares/modules/partition/module.desc" \
+  "usr/share/applications/calamares.desktop"
+build_package \
+  "aura-calamares-config" \
+  "aura-calamares-config-1.0.0.tar.gz" \
+  "etc/calamares/settings.conf" \
+  "etc/calamares/branding/aura/branding.desc" \
+  "etc/calamares/modules/unpackfs.conf"
 build_package \
   "aura-dl" \
   "aura-dl-${AURA_DL_VERSION}.tar.gz" \

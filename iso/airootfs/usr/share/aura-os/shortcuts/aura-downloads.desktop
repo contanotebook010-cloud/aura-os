@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Downloads
+Comment=Abrir a pasta Downloads
+Exec=thunar ~/Downloads
+Icon=folder-download
+Terminal=false
+StartupNotify=true
+Categories=System;FileTools;

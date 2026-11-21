@@ -3,9 +3,14 @@
 # via autostart do XFCE. Idempotente: se o marcador existir, não faz nada.
 set -euo pipefail
 
-readonly MARKER="${XDG_CONFIG_HOME:-$HOME/.config}/aura/first-boot.done"
+readonly CONFIG_HOME="${XDG_CONFIG_HOME:-${HOME}/.config}"
+readonly MARKER="${CONFIG_HOME}/aura/first-boot.done"
+readonly PRESET_MARKER="${CONFIG_HOME}/aura/xfce-preset-ok"
+readonly PRESET_SOURCE="/usr/share/aura-os/xfce-preset"
+readonly SHORTCUT_SOURCE="/usr/share/aura-os/shortcuts"
+readonly WALLPAPER="/usr/share/aura-os/wallpapers/aura-windows-classic.svg"
 
-if [[ -f "${MARKER}" ]]; then
+if [[ -f "${MARKER}" && -f "${PRESET_MARKER}" ]]; then
   exit 0
 fi
 
@@ -13,6 +18,57 @@ fi
 # o idioma do locale. Isso garante que o aura-dl tenha a pasta de destino pronta.
 xdg-user-dirs-update
 
-# Marcador gravado só ao final: se algo falhar antes, a próxima sessão tenta de novo.
-mkdir -p -- "$(dirname -- "${MARKER}")"
+# O preset é reinstalado apenas até a primeira aplicação completa. Depois,
+# o marcador evita sobrescrever personalizações feitas pelo usuário.
+if [[ -d "${PRESET_SOURCE}" ]]; then
+  mkdir -p -- "${CONFIG_HOME}"
+  cp -a -- "${PRESET_SOURCE}/." "${CONFIG_HOME}/"
+fi
+
+# Os atalhos ficam na área de trabalho e também no diretório XDG, que pode
+# ter um nome localizado em uma instalação em outro idioma.
+install -d -m 0755 "${HOME}/Desktop"
+desktop_dir="$(xdg-user-dir DESKTOP 2>/dev/null || true)"
+if [[ -z "${desktop_dir}" || "${desktop_dir}" == "${HOME}/Desktop" ]]; then
+  desktop_dir="${HOME}/Desktop"
+fi
+install -d -m 0755 "${desktop_dir}"
+for shortcut in "${SHORTCUT_SOURCE}"/*.desktop; do
+  [[ -e "${shortcut}" ]] || continue
+  install -m 0644 "${shortcut}" "${HOME}/Desktop/$(basename -- "${shortcut}")"
+  install -m 0644 "${shortcut}" "${desktop_dir}/$(basename -- "${shortcut}")"
+done
+
+# Garante os valoresXfconf no daemon da sessão. O XML pré-carregado define o
+# layout; estas chamadas consolidam tema, fontes, posição e papel de parede.
+set_xfconf() {
+  local channel="$1"
+  local property="$2"
+  local value_type="$3"
+  local value="$4"
+
+  xfconf-query \
+    --channel "${channel}" \
+    --property "${property}" \
+    --type "${value_type}" \
+    --set "${value}" \
+    --create \
+    >/dev/null
+}
+
+set_xfconf "xsettings" "/Net/ThemeName" "string" "Materia"
+set_xfconf "xsettings" "/Net/IconThemeName" "string" "Papirus"
+set_xfconf "xsettings" "/Net/DefaultFont" "string" "Roboto 10"
+set_xfconf "xsettings" "/Net/MonospaceFont" "string" "JetBrains Mono 10"
+set_xfconf "xfce4-panel" "/panels/panel-1/position" "string" "p=6;x=0;y=0"
+set_xfconf "xfce4-desktop" "/desktop-icons/style" "int" "2"
+set_xfconf "xfce4-desktop" "/backdrop/screen0/monitor0/image-path" "string" "${WALLPAPER}"
+set_xfconf "xfce4-desktop" "/backdrop/screen0/monitor0/image-style" "int" "4"
+
+/usr/local/bin/aura-validate-xfce-preset --home "${HOME}"
+
+# Marcadores gravados só ao final: se algo falhar antes, a próxima sessão
+# tenta de novo.
+mkdir -p -- "$(dirname -- "${MARKER}")" "$(dirname -- "${PRESET_MARKER}")"
 date --iso-8601=seconds > "${MARKER}"
+date --iso-8601=seconds > "${PRESET_MARKER}"

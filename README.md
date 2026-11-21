@@ -1,20 +1,23 @@
 # Aura OS
 
-Distribuição live baseada em Arch Linux, com XFCE4 estilizado em Material
-Design, cursor Bibata, ícones Papirus e o downloader `aura-dl` (em Rust).
+Distribuição live baseada em Arch Linux, com XFCE4 em um preset clássico
+inspirado no Windows 10, tema Materia, ícones Papirus e o downloader `aura-dl`
+(em Rust).
 
 ## Status
 
-Em desenvolvimento. O perfil `archiso`, o pipeline de build e o smoke test de
-boot em QEMU estão implementados. Ainda não estão concluídos:
+Em desenvolvimento. O perfil `archiso`, o pipeline de build e a validação de
+boot em QEMU estão implementados. O preset XFCE e o instalador gráfico
+Calamares são compilados e verificados durante o pipeline:
 
-- tema Material próprio (`theme/`);
-- instalador (`installer/`);
-- cursor Bibata (download com checksum SHA-256);
 - interface gráfica GTK4/libadwaita do `aura-dl`.
 
 O `aura-dl` em modo CLI e a ponte para Firefox/LibreWolf já são empacotados
 como repositório local e instalados na ISO.
+
+O instalador Calamares 3.4.3 é compilado do código upstream com checksum
+fixo; seus pacotes e configurações são publicados somente no repositório
+temporário `/tmp/aura-os-repo` durante a geração da ISO.
 
 ## Requisitos para build
 
@@ -48,12 +51,19 @@ gravado na árvore do repositório.
 - **VMware Workstation/Player:** crie uma VM Linux 64 bits, aponte o CD/DVD
   para a ISO e ative aceleração 3D.
 
-O CI inicializa a ISO em QEMU headless e só a aprova quando os processos
-`xfce4-session` e `xfdesktop` estão em execução e o `systemd-logind`
-registra uma sessão X11 ativa do usuário `aura`. O guest publica o marcador
-`AURA_XFCE_SMOKE_OK` apenas depois dessas três verificações. Isso protege
-contra regressões no initramfs, no `switch-root` e no login automático, que
-podem gerar uma ISO que compila, mas não chega à área de trabalho.
+O primeiro login aplica um preset XFCE idempotente em `/etc/skel` e no usuário
+live. Ele configura painel inferior, menu Iniciar Whisker com favoritos,
+recentes e busca, lista de janelas, bandeja, relógio, Materia, Papirus, Roboto,
+JetBrains Mono, papel de parede original do Aura e atalhos para Este
+Computador, Arquivos, Downloads, Documentos, Lixeira e Instalar Aura OS.
+
+O CI inicializa a ISO em QEMU headless e só a aprova quando existe uma sessão
+X11 XFCE real do usuário `aura`, o preset está aplicado e validado, e o
+Calamares 3.4.3 abre com seus módulos, sequência e configuração presentes. A
+live publica `AURA_XFCE_PRESET_OK`, `AURA_CALAMARES_OK` e
+`AURA_XFCE_SMOKE_OK` somente depois das respectivas verificações. O smoke
+também remove da instalação final o `sudo NOPASSWD`, o autologin e os serviços
+temporários da live.
 
 ## Estrutura
 
@@ -68,8 +78,9 @@ podem gerar uma ISO que compila, mas não chega à área de trabalho.
   estrutura de um perfil do zero.
 - **Pacotes oficiais:** tudo que está em `core`, `extra` ou `multilib` vem dos
   repositórios oficiais. Pacotes próprios usam o repositório local `[aura]`.
-- **Senha da live:** `aura`, temporária. Deve ser trocada no instalador ou no
-  primeiro boot.
+- **Credenciais da live:** usuário `aura`, senha `aura`.
+- **Instalação:** o Calamares cria a conta normal escolhida pelo usuário,
+  exige senha e configura `wheel` sem copiar o `NOPASSWD` da live.
 - **Sudo na live:** `NOPASSWD` apenas para o grupo `wheel`, somente na live. A
   regra deve ser removida no sistema instalado.
 - **Reprodutibilidade:** a versão e o label da ISO derivam de
@@ -81,7 +92,9 @@ podem gerar uma ISO que compila, mas não chega à área de trabalho.
   release ela precisa ser carregada temporariamente em `about:debugging`.
 - O `aura-dl` oferece somente a CLI; não há interface gráfica, fila,
   cancelamento nem histórico.
-- Ainda não existe instalador; a ISO é uma live.
+- O instalador ainda depende de validação completa em hardware físico; o CI
+  valida a abertura do Calamares e a configuração, não executa uma instalação
+  destrutiva em disco real.
 - Aplicativos libadwaita (GTK4) ignoram o tema GTK comum.
 
 ## Licença

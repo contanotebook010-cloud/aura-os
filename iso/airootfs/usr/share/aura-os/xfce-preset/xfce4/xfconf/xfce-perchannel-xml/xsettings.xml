@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="Materia"/>
+    <property name="IconThemeName" type="string" value="Papirus"/>
+    <property name="DefaultFont" type="string" value="Roboto 10"/>
+    <property name="MonospaceFont" type="string" value="JetBrains Mono 10"/>
+  </property>
+</channel>

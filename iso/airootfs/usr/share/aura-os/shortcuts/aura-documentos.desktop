@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Documentos
+Comment=Abrir a pasta Documentos
+Exec=thunar ~/Documents
+Icon=folder-documents
+Terminal=false
+StartupNotify=true
+Categories=System;FileTools;

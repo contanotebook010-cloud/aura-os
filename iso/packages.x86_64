@@ -31,16 +31,23 @@ xf86-input-vmmouse
 open-vm-tools
 
 # --- Desktop ---
-xfce4
-# Componentes críticos também são explícitos: a sessão não pode depender
-# apenas da seleção automática do grupo xfce4.
+# Componentes explícitos: a sessão e o preset não dependem da seleção
+# automática do grupo xfce4 nem do conjunto xfce4-goodies.
 xfce4-session
+xfce4-panel
+xfwm4
 xfdesktop
-xfce4-goodies
+xfce4-settings
+xfce4-appfinder
+xfce4-whiskermenu-plugin
+xfce4-pulseaudio-plugin
+xfce4-power-manager
+xfce4-notifyd
+xfconf
+garcon
 lightdm
 lightdm-gtk-greeter
 picom
-xfce4-notifyd
 
 # --- Tema e fontes ---
 materia-gtk-theme
@@ -76,6 +83,20 @@ fastfetch
 # --- Boot (BIOS legado e UEFI) ---
 syslinux
 systemd
+
+# --- Instalador Calamares ---
+calamares
+aura-calamares-config
+grub
+efibootmgr
+rsync
+lvm2
+btrfs-progs
+cryptsetup
+dosfstools
+python
+python-yaml
+python-jsonschema
 
 # --- Aplicativos próprios do Aura OS ---
 aura-dl
