@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aplicar o preset do Aura OS
+Comment=Aplica o preset XFCE clássico do Aura OS no primeiro login
+Exec=/usr/local/bin/aura-first-boot
+Icon=aura-os
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

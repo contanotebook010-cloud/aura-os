@@ -2,8 +2,12 @@
 *.sh text eol=lf
 iso/airootfs/**/*.sh text eol=lf
 iso/airootfs/usr/local/bin/aura-first-boot text eol=lf
+iso/airootfs/usr/local/bin/aura-install-cleanup text eol=lf
 iso/airootfs/usr/local/bin/aura-session-ready text eol=lf
+iso/airootfs/usr/local/bin/aura-validate-calamares text eol=lf
+iso/airootfs/usr/local/bin/aura-validate-xfce-preset text eol=lf
 iso/airootfs/etc/systemd/system/*.service text eol=lf
 iso/airootfs/etc/systemd/system/*.timer text eol=lf
 *.yml text eol=lf
+*.py text eol=lf
 PKGBUILD text eol=lf

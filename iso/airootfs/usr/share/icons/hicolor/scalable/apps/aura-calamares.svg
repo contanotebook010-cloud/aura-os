@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Instalar Aura OS">
+  <defs>
+    <linearGradient id="aura" x1="20" y1="18" x2="108" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67e8f9"/>
+      <stop offset=".5" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+  <rect x="12" y="17" width="104" height="78" rx="12" fill="#11152b" stroke="url(#aura)" stroke-width="4"/>
+  <rect x="23" y="28" width="82" height="54" rx="7" fill="#20254a"/>
+  <path d="m46 66 15-36h8l15 36h-8l-3-9H56l-3 9h-7Zm13-16h7l-3.5-11L59 50Z" fill="#f8fafc"/>
+  <path d="M46 95h36l8 13H38l8-13Z" fill="url(#aura)"/>
+  <path d="m91 72 13 13 13-13" fill="none" stroke="#67e8f9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

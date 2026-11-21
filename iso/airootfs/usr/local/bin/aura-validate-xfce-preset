@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Valida o preset XFCE clássico do Aura OS no home de um usuário."""
+
+from __future__ import annotations
+
+import argparse
+import configparser
+import os
+from pathlib import Path
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+PANEL_PLUGIN_IDS = {
+    "whiskermenu",
+    "launcher",
+    "tasklist",
+    "systray",
+    "pulseaudio",
+    "power-manager-plugin",
+    "notification-plugin",
+    "clock",
+}
+REQUIRED_FAVORITES = {
+    "aura-calamares.desktop",
+    "thunar.desktop",
+    "firefox.desktop",
+    "Alacritty.desktop",
+    "libreoffice-writer.desktop",
+}
+REQUIRED_SHORTCUTS = {
+    "aura-computador.desktop": "Este Computador",
+    "aura-arquivos.desktop": "Arquivos",
+    "aura-downloads.desktop": "Downloads",
+    "aura-documentos.desktop": "Documentos",
+    "aura-lixeira.desktop": "Lixeira",
+    "aura-calamares.desktop": "Instalar Aura OS",
+}
+WALLPAPER = "/usr/share/aura-os/wallpapers/aura-windows-classic.svg"
+
+
+def parse_properties(node: ET.Element, prefix: str = "") -> dict[str, object]:
+    """Converte a representação XML do Xfconf em um mapa de propriedades."""
+    properties: dict[str, object] = {}
+    for child in node.findall("property"):
+        name = child.attrib["name"]
+        path = f"{prefix}/{name}"
+        if "value" in child.attrib:
+            properties[path] = child.attrib["value"]
+            continue
+
+        values = [item.attrib.get("value", "") for item in child.findall("value")]
+        if values:
+            properties[path] = values
+        properties.update(parse_properties(child, path))
+    return properties
+
+
+def load_xml(path: Path, failures: list[str]) -> dict[str, object]:
+    try:
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError) as error:
+        failures.append(f"XML inválido em {path}: {error}")
+        return {}
+    return parse_properties(root)
+
+
+def xfconf_value(channel: str, prop: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["xfconf-query", "-c", channel, "-p", prop],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+def parse_ini(path: Path, failures: list[str]) -> configparser.ConfigParser:
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        with path.open(encoding="utf-8") as stream:
+            parser.read_file(stream)
+    except (OSError, configparser.Error) as error:
+        failures.append(f"INI inválido em {path}: {error}")
+    return parser
+
+
+def font_matches(family: str) -> bool:
+    try:
+        result = subprocess.run(
+            ["fc-match", "-f", "%{family}", family],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0 and family.lower() in result.stdout.lower()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--home", default=os.path.expanduser("~"))
+    args = parser.parse_args()
+
+    home = Path(args.home).resolve()
+    failures: list[str] = []
+
+    config_root = home / ".config"
+    panel_path = config_root / "xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+    desktop_path = config_root / "xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml"
+    xsettings_path = config_root / "xfce4/xfconf/xfce-perchannel-xml/xsettings.xml"
+
+    panel = load_xml(panel_path, failures)
+    desktop = load_xml(desktop_path, failures)
+    xsettings = load_xml(xsettings_path, failures)
+
+    if panel.get("/panels/panel-1/position") != "p=6;x=0;y=0":
+        failures.append("o painel não está posicionado na parte inferior")
+
+    plugin_ids = {
+        str(value)
+        for key, value in panel.items()
+        if key.startswith("/plugins/plugin-") and "/" not in key.removeprefix("/plugins/plugin-")
+    }
+    missing_plugins = sorted(PANEL_PLUGIN_IDS - plugin_ids)
+    if missing_plugins:
+        failures.append(f"plugins ausentes no painel: {', '.join(missing_plugins)}")
+
+    favorites = panel.get("/plugins/plugin-1/favorites", [])
+    if not isinstance(favorites, list):
+        favorites = []
+    missing_favorites = sorted(REQUIRED_FAVORITES - set(favorites))
+    if missing_favorites:
+        failures.append(f"favoritos ausentes: {', '.join(missing_favorites)}")
+
+    launcher_items = panel.get("/plugins/plugin-2/items", [])
+    if not isinstance(launcher_items, list) or "xfce4-appfinder.desktop" not in launcher_items:
+        failures.append("o launcher de busca do Appfinder não está no painel")
+
+    if panel.get("/plugins/plugin-1/button-icon") != "aura-os":
+        failures.append("o botão Iniciar não usa o ícone original do Aura")
+    if panel.get("/plugins/plugin-1/button-title") != "Iniciar":
+        failures.append("o botão Iniciar não tem o título esperado")
+    if panel.get("/plugins/plugin-1/default-category") != "1":
+        failures.append("os itens recentes não são a categoria inicial do Whisker")
+    if panel.get("/plugins/plugin-1/recent-items-max") != "12":
+        failures.append("a lista de recentes não está configurada")
+
+    if desktop.get("/desktop-icons/style") != "2":
+        failures.append("os ícones da área de trabalho não exibem atalhos e ícones do sistema")
+    if desktop.get("/backdrop/screen0/monitor0/image-path") != WALLPAPER:
+        failures.append("o papel de parede original do Aura não está configurado")
+
+    if xsettings.get("/Net/ThemeName") != "Materia":
+        failures.append("o tema Xfce predefinido não é Materia")
+    if xsettings.get("/Net/IconThemeName") != "Papirus":
+        failures.append("o tema de ícones predefinido não é Papirus")
+    if xsettings.get("/Net/DefaultFont") != "Roboto 10":
+        failures.append("a fonte padrão não é Roboto")
+    if xsettings.get("/Net/MonospaceFont") != "JetBrains Mono 10":
+        failures.append("a fonte monoespaçada não é JetBrains Mono")
+
+    for gtk_version in ("gtk-3.0", "gtk-4.0"):
+        gtk = parse_ini(config_root / gtk_version / "settings.ini", failures)
+        if not gtk.has_section("Settings"):
+            failures.append(f"configuração GTK ausente em {gtk_version}")
+            continue
+        if gtk.get("Settings", "gtk-theme-name", fallback="") != "Materia":
+            failures.append(f"tema GTK incorreto em {gtk_version}")
+        if gtk.get("Settings", "gtk-icon-theme-name", fallback="") != "Papirus":
+            failures.append(f"ícones GTK incorretos em {gtk_version}")
+        if "Roboto" not in gtk.get("Settings", "gtk-font-name", fallback=""):
+            failures.append(f"fonte GTK incorreta em {gtk_version}")
+
+    for filename, expected_name in REQUIRED_SHORTCUTS.items():
+        shortcut = home / "Desktop" / filename
+        if not shortcut.is_file():
+            failures.append(f"atalho ausente: {filename}")
+            continue
+        try:
+            content = shortcut.read_text(encoding="utf-8")
+        except OSError as error:
+            failures.append(f"não foi possível ler {shortcut}: {error}")
+            continue
+        if f"Name={expected_name}" not in content:
+            failures.append(f"nome incorreto no atalho {filename}")
+
+    if not Path("/usr/share/themes/Materia").is_dir():
+        failures.append("tema Materia não instalado")
+    if not Path("/usr/share/icons/Papirus").is_dir():
+        failures.append("tema de ícones Papirus não instalado")
+    if not Path("/usr/share/icons/hicolor/scalable/apps/aura-os.svg").is_file():
+        failures.append("ícone original do Aura não instalado")
+    if not Path(WALLPAPER).is_file():
+        failures.append("papel de parede original do Aura não instalado")
+    if not font_matches("Roboto"):
+        failures.append("fonte Roboto não instalada")
+    if not font_matches("JetBrains Mono"):
+        failures.append("fonte JetBrains Mono não instalada")
+
+    runtime_checks = (
+        ("xsettings", "/Net/ThemeName", "Materia"),
+        ("xsettings", "/Net/IconThemeName", "Papirus"),
+        ("xsettings", "/Net/DefaultFont", "Roboto 10"),
+        ("xsettings", "/Net/MonospaceFont", "JetBrains Mono 10"),
+        ("xfce4-panel", "/panels/panel-1/position", "p=6;x=0;y=0"),
+        ("xfce4-panel", "/plugins/plugin-1", "whiskermenu"),
+        ("xfce4-desktop", "/desktop-icons/style", "2"),
+        ("xfce4-desktop", "/backdrop/screen0/monitor0/image-path", WALLPAPER),
+    )
+    for channel, prop, expected in runtime_checks:
+        actual = xfconf_value(channel, prop)
+        if actual != expected:
+            failures.append(
+                f"propriedade Xfconf incorreta {channel}:{prop} (esperado {expected!r}, obtido {actual!r})"
+            )
+
+    if failures:
+        print("preset XFCE inválido:", file=sys.stderr)
+        for failure in failures:
+            print(f"- {failure}", file=sys.stderr)
+        return 1
+
+    print("AURA_XFCE_PRESET_VALID")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

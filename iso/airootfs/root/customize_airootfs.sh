@@ -25,6 +25,25 @@ install -d -m 0750 /etc/sudoers.d
 printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/10-aura-live
 chmod 0440 /etc/sudoers.d/10-aura-live
 
+# O preset é pré-carregado no skel e no home da live. Assim, o primeiro login
+# já encontra o painel inferior, o menu Iniciar, os temas e os atalhos. O
+# script idempotente aura-first-boot consolida os valores no Xfconf.
+install_preset() {
+  local target_home="$1"
+  local target_owner="$2"
+  local target_group="$3"
+
+  install -d -m 0755 "${target_home}/.config" "${target_home}/Desktop"
+  cp -a -- /usr/share/aura-os/xfce-preset/. "${target_home}/.config/"
+  for shortcut in /usr/share/aura-os/shortcuts/*.desktop; do
+    install -m 0644 "${shortcut}" "${target_home}/Desktop/$(basename -- "${shortcut}")"
+  done
+  chown -R "${target_owner}:${target_group}" "${target_home}/.config" "${target_home}/Desktop"
+}
+
+install_preset "/etc/skel" "root" "root"
+install_preset "/home/${LIVE_USER}" "${LIVE_USER}" "$(id -gn "${LIVE_USER}")"
+
 # Identidade e timezone básicos. Sem estes arquivos, o systemd-firstboot abre
 # o assistente interativo de configuração e impede a live de chegar ao XFCE.
 printf 'aura\n' > /etc/hostname

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Este Computador
+Comment=Mostrar o sistema de arquivos do computador
+Exec=thunar /
+Icon=system-computer
+Terminal=false
+StartupNotify=true
+Categories=System;FileTools;

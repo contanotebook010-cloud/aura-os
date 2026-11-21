@@ -1,0 +1,17 @@
+# Maintainer: Aura do Sigma <aura@aura-os.local>
+# shellcheck shell=bash disable=SC2034,SC2154
+pkgname=aura-calamares-config
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Configuração do instalador Calamares para o Aura OS"
+arch=('any')
+url="https://github.com/contanotebook010-cloud/aura-os"
+license=('MIT')
+depends=('calamares')
+source=("aura-calamares-config-${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+  cd "${srcdir}/aura-calamares-config-${pkgver}" || exit 1
+  cp -a etc "${pkgdir}/"
+}

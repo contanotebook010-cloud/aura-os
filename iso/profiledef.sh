@@ -32,5 +32,8 @@ file_permissions=(
   ["/root"]="0:0:750"
   ["/root/customize_airootfs.sh"]="0:0:755"
   ["/usr/local/bin/aura-first-boot"]="0:0:755"
+  ["/usr/local/bin/aura-install-cleanup"]="0:0:755"
   ["/usr/local/bin/aura-session-ready"]="0:0:755"
+  ["/usr/local/bin/aura-validate-calamares"]="0:0:755"
+  ["/usr/local/bin/aura-validate-xfce-preset"]="0:0:755"
 )

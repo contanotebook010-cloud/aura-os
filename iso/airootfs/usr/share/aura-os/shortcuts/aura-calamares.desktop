@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Instalar Aura OS
+Comment=Iniciar o instalador gráfico do Aura OS
+Exec=pkexec calamares
+Icon=aura-calamares
+Terminal=false
+StartupNotify=true
+Categories=System;
+Keywords=install;installer;calamares;

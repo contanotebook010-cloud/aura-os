@@ -63,7 +63,13 @@ jobs:
           pacman -Syu --noconfirm archlinux-keyring
 
       - name: Instalar dependências de build
-        run: pacman -S --noconfirm --needed archiso base-devel git libarchive rust shellcheck
+        run: >-
+          pacman -S --noconfirm --needed
+          archiso base-devel git libarchive rust shellcheck curl
+          cmake extra-cmake-modules libglvnd ninja python
+          qt6-tools qt6-translations
+          kcoreaddons kpmcore libpwquality polkit-qt6
+          qt6-svg yaml-cpp python-yaml python-jsonschema
 
       - uses: actions/checkout@v4
 
@@ -75,10 +81,16 @@ jobs:
             iso/profiledef.sh \
             iso/airootfs/root/customize_airootfs.sh \
             iso/airootfs/usr/local/bin/aura-first-boot \
+            iso/airootfs/usr/local/bin/aura-install-cleanup \
             iso/airootfs/usr/local/bin/aura-session-ready \
             packages/build-local-repo.sh \
             packages/aura-dl/PKGBUILD \
-            packages/aura-dl-bridge/PKGBUILD
+            packages/aura-dl-bridge/PKGBUILD \
+            packages/calamares/PKGBUILD \
+            packages/aura-calamares-config/PKGBUILD
+
+      - name: Validar a configuração do Calamares
+        run: python packages/validate-calamares-config.py
 
       - name: Construir a ISO
         working-directory: iso
@@ -110,14 +122,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86
 
-      - name: Iniciar a live e validar a sessão XFCE
+      - name: Iniciar a live e validar XFCE, preset e Calamares
         run: |
           iso="$(find iso/out -maxdepth 1 -type f -name '*.iso' -print -quit)"
           test -n "${iso}"
 
           qemu-system-x86_64 \
             -machine accel=tcg \
-            -m 2048 -smp 2 \
+            -m 4096 -smp 2 \
             -display none \
             -vga std \
             -monitor none \
@@ -128,8 +140,8 @@ jobs:
             > boot.log 2>&1 &
           qemu_pid=$!
 
-          # A imagem publica AURA_XFCE_SMOKE_OK somente quando os processos
-          # xfce4-session/xfdesktop e uma sessão X11 ativa do logind existem.
+          # A imagem publica os três marcadores somente quando a sessão XFCE
+          # real existe, o preset clássico está aplicado e o Calamares abre.
           deadline=$((SECONDS + 600))
           while ((SECONDS < deadline)); do
             if grep -Fq 'AURA_XFCE_SMOKE_OK' boot.log \
@@ -165,10 +177,15 @@ jobs:
             exit 1
           fi
 
-          if ! grep -Fq 'AURA_XFCE_SMOKE_OK' boot.clean.log; then
-            echo "erro: timeout sem AURA_XFCE_SMOKE_OK (qemu status ${status})" >&2
-            exit 1
-          fi
+          for marker in \
+            AURA_XFCE_PRESET_OK \
+            AURA_CALAMARES_OK \
+            AURA_XFCE_SMOKE_OK; do
+            if ! grep -Fq "${marker}" boot.clean.log; then
+              echo "erro: timeout sem ${marker} (qemu status ${status})" >&2
+              exit 1
+            fi
+          done
 
       - name: Enviar os logs do smoke test
         if: always()

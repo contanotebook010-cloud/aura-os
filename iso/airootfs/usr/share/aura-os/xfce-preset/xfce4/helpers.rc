@@ -1,0 +1,4 @@
+[Desktop]
+TerminalExec=alacritty
+FileManagerExec=Thunar
+WebBrowserExec=firefox

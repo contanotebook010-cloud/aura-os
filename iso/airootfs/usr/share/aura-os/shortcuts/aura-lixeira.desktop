@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Lixeira
+Comment=Abrir a lixeira
+Exec=thunar trash:///
+Icon=user-trash
+Terminal=false
+StartupNotify=true
+Categories=System;FileTools;

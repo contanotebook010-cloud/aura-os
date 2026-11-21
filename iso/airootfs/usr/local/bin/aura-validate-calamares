@@ -1,0 +1,312 @@
+#!/usr/bin/env python3
+"""Valida o binário, a configuração e os módulos do Calamares do Aura OS."""
+
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import yaml
+
+CALAMARES_VERSION = "3.4.3"
+REQUIRED_SHOW = {"welcome", "locale", "keyboard", "partition", "users", "summary"}
+REQUIRED_EXEC = [
+    "partition",
+    "mount",
+    "unpackfs",
+    "machineid",
+    "locale",
+    "keyboard",
+    "localecfg",
+    "fstab",
+    "initcpiocfg",
+    "initcpio",
+    "removeuser",
+    "users",
+    "displaymanager",
+    "services-systemd",
+    "shellprocess@cleanup-live",
+    "grubcfg",
+    "bootloader",
+    "umount",
+]
+REQUIRED_MODULES = REQUIRED_SHOW | set(REQUIRED_EXEC)
+CONFIG_ROOT = Path("/etc/calamares")
+
+
+def load_yaml(path: Path, failures: list[str]) -> dict:
+    try:
+        with path.open(encoding="utf-8") as stream:
+            value = yaml.safe_load(stream)
+    except (OSError, yaml.YAMLError) as error:
+        failures.append(f"YAML inválido em {path}: {error}")
+        return {}
+    if not isinstance(value, dict):
+        failures.append(f"a raiz de {path} não é um mapa YAML")
+        return {}
+    return value
+
+
+def phase_modules(sequence: list, phase: str) -> list[str]:
+    modules: list[str] = []
+    for item in sequence:
+        if isinstance(item, dict) and isinstance(item.get(phase), list):
+            modules.extend(str(module) for module in item[phase])
+    return modules
+
+
+def find_descriptor(module: str) -> Path | None:
+    candidates = (
+        Path("/usr/lib/calamares/modules") / module / "module.desc",
+        Path("/usr/share/calamares/modules") / module / "module.desc",
+    )
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def validate_module(module: str, failures: list[str]) -> None:
+    descriptor = find_descriptor(module)
+    if descriptor is None:
+        failures.append(f"módulo Calamares ausente: {module}")
+        return
+
+    metadata = load_yaml(descriptor, failures)
+    interface = metadata.get("interface")
+    if interface == "qtplugin":
+        library = metadata.get("load")
+        if not library or not (descriptor.parent / str(library)).is_file():
+            failures.append(f"biblioteca do módulo {module} ausente")
+    elif interface == "python":
+        script = metadata.get("script")
+        if not script or not (descriptor.parent / str(script)).is_file():
+            failures.append(f"script do módulo {module} ausente")
+    else:
+        failures.append(f"interface desconhecida para o módulo {module}: {interface!r}")
+
+
+def validate_sequence(settings: dict, failures: list[str]) -> None:
+    sequence = settings.get("sequence")
+    if not isinstance(sequence, list):
+        failures.append("sequence ausente ou inválida em settings.conf")
+        return
+
+    show = phase_modules(sequence, "show")
+    execute = phase_modules(sequence, "exec")
+    missing_show = sorted(REQUIRED_SHOW - set(show))
+    if missing_show:
+        failures.append(f"etapas de interface ausentes: {', '.join(missing_show)}")
+    if execute != REQUIRED_EXEC:
+        failures.append(f"ordem de execução inesperada: {execute!r}")
+
+    if settings.get("branding") != "aura":
+        failures.append("branding do Calamares não é aura")
+    if settings.get("prompt-install") is not True:
+        failures.append("a confirmação de instalação não está habilitada")
+    if settings.get("dont-chroot") is not False:
+        failures.append("o instalador não está configurado para usar chroot")
+
+
+def validate_module_configs(failures: list[str]) -> None:
+    settings = load_yaml(CONFIG_ROOT / "settings.conf", failures)
+    execute = phase_modules(settings.get("sequence", []), "exec")
+
+    for path in sorted((CONFIG_ROOT / "modules").glob("*.conf")):
+        load_yaml(path, failures)
+
+    for module in sorted(REQUIRED_MODULES):
+        if module.startswith("shellprocess@"):
+            continue
+        path = CONFIG_ROOT / "modules" / f"{module}.conf"
+        if not path.is_file():
+            failures.append(f"configuração do módulo ausente: {path}")
+
+    partition = load_yaml(CONFIG_ROOT / "modules/partition.conf", failures)
+    if partition.get("efi", {}).get("mountPoint") != "/boot":
+        failures.append("a ESP não está configurada em /boot")
+
+    unpackfs = load_yaml(CONFIG_ROOT / "modules/unpackfs.conf", failures)
+    unpack = unpackfs.get("unpack", [])
+    sources = {item.get("source") for item in unpack if isinstance(item, dict)}
+    if "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs" not in sources:
+        failures.append("a raiz da live não está configurada no unpackfs")
+    if "/run/archiso/bootmnt/arch/boot/x86_64/vmlinuz-linux" not in sources:
+        failures.append("o kernel da live não está configurado no unpackfs")
+    exclusions = {
+        exclusion
+        for item in unpack
+        if isinstance(item, dict)
+        for exclusion in item.get("exclude", [])
+    }
+    if "/etc/mkinitcpio.conf.d/archiso.conf" not in exclusions:
+        failures.append("a configuração archiso não é removida do sistema instalado")
+
+    users = load_yaml(CONFIG_ROOT / "modules/users.conf", failures)
+    if users.get("sudoersGroup") != "wheel":
+        failures.append("o grupo sudoers do usuário instalado não é wheel")
+    if users.get("doAutologin") is not False:
+        failures.append("o autologin não está desabilitado no usuário instalado")
+
+    removeuser = load_yaml(CONFIG_ROOT / "modules/removeuser.conf", failures)
+    if removeuser.get("username") != "aura":
+        failures.append("a conta temporária aura não é removida")
+    removeuser_index = execute.index("removeuser") if "removeuser" in execute else -1
+    users_index = execute.index("users") if "users" in execute else -1
+    if removeuser_index >= 0 and users_index >= 0 and removeuser_index > users_index:
+        failures.append("a conta temporária deve ser removida antes de criar o usuário")
+
+    displaymanager = load_yaml(CONFIG_ROOT / "modules/displaymanager.conf", failures)
+    if displaymanager.get("displaymanagers") != ["lightdm"]:
+        failures.append("o LightDM não é o gerenciador de display instalado")
+
+    services = load_yaml(CONFIG_ROOT / "modules/services-systemd.conf", failures)
+    disabled = {
+        unit.get("name")
+        for unit in services.get("units", [])
+        if isinstance(unit, dict) and unit.get("action") == "disable"
+    }
+    if "aura-session-ready.timer" not in disabled:
+        failures.append("o timer de smoke da live não é desabilitado no sistema instalado")
+
+    cleanup = load_yaml(CONFIG_ROOT / "modules/cleanup-live.conf", failures)
+    script = cleanup.get("script", [])
+    if "/usr/local/bin/aura-install-cleanup" not in script:
+        failures.append("a limpeza dos artefatos da live não está configurada")
+
+
+def validate_branding(failures: list[str]) -> None:
+    branding_root = CONFIG_ROOT / "branding/aura"
+    branding = load_yaml(branding_root / "branding.desc", failures)
+    strings = branding.get("strings", {})
+    if strings.get("productName") != "Aura OS":
+        failures.append("o nome do produto no branding está incorreto")
+    images = branding.get("images", {})
+    for image_name in ("productIcon", "productLogo", "productWelcome"):
+        filename = images.get(image_name)
+        if not filename or not (branding_root / str(filename)).is_file():
+            failures.append(f"imagem de branding ausente: {image_name}")
+
+
+def validate_launcher(failures: list[str]) -> None:
+    launcher = Path("/usr/share/applications/aura-calamares.desktop")
+    if not launcher.is_file():
+        failures.append("atalho global do instalador ausente")
+        return
+    try:
+        content = launcher.read_text(encoding="utf-8")
+    except OSError as error:
+        failures.append(f"não foi possível ler o atalho do instalador: {error}")
+        return
+    if "Exec=pkexec calamares" not in content:
+        failures.append("o atalho do instalador não executa calamares com pkexec")
+    if "Icon=aura-calamares" not in content:
+        failures.append("o atalho do instalador não usa o ícone original do Aura")
+
+
+def validate_binary(failures: list[str], gui_smoke: bool) -> None:
+    binary = shutil.which("calamares")
+    if binary is None:
+        failures.append("binário calamares ausente")
+        return
+
+    try:
+        version = subprocess.run(
+            [binary, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        failures.append(f"não foi possível executar calamares --version: {error}")
+        return
+    if version.returncode != 0 or CALAMARES_VERSION not in (version.stdout + version.stderr):
+        failures.append(
+            f"versão inesperada do Calamares: {(version.stdout + version.stderr).strip()!r}"
+        )
+
+    try:
+        libraries = subprocess.run(
+            ["ldd", binary],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        libraries = None
+    if libraries is not None:
+        missing = [line.strip() for line in libraries.stdout.splitlines() if "not found" in line]
+        if missing:
+            failures.append(f"bibliotecas ausentes no Calamares: {', '.join(missing)}")
+
+    if not gui_smoke:
+        return
+
+    environment = os.environ.copy()
+    environment["QT_QPA_PLATFORM"] = "offscreen"
+    environment["QT_LOGGING_RULES"] = "*.debug=false"
+    with tempfile.TemporaryDirectory(prefix="aura-calamares-runtime-") as runtime_dir:
+        os.chmod(runtime_dir, 0o700)
+        environment["XDG_RUNTIME_DIR"] = runtime_dir
+        try:
+            result = subprocess.run(
+                ["timeout", "--signal=TERM", "8", binary],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=environment,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            failures.append(f"o smoke gráfico do Calamares não pôde ser executado: {error}")
+            return
+    if result.returncode not in (0, 124):
+        output = (result.stdout + result.stderr).strip()
+        failures.append(
+            f"o Calamares encerrou durante o smoke gráfico (status {result.returncode}): {output}"
+        )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gui-smoke", action="store_true")
+    args = parser.parse_args()
+
+    failures: list[str] = []
+    if not CONFIG_ROOT.is_dir():
+        failures.append("configuração /etc/calamares ausente")
+        settings: dict = {}
+    else:
+        settings = load_yaml(CONFIG_ROOT / "settings.conf", failures)
+
+    if settings:
+        validate_sequence(settings, failures)
+        validate_module_configs(failures)
+        validate_branding(failures)
+
+    for module in sorted(REQUIRED_MODULES):
+        validate_module(module.split("@", 1)[0], failures)
+
+    validate_launcher(failures)
+    validate_binary(failures, args.gui_smoke)
+
+    cleanup_script = Path("/usr/local/bin/aura-install-cleanup")
+    if not cleanup_script.is_file() or not os.access(cleanup_script, os.X_OK):
+        failures.append("script de limpeza da live ausente ou não executável")
+
+    if failures:
+        print("Calamares inválido:", file=sys.stderr)
+        for failure in failures:
+            print(f"- {failure}", file=sys.stderr)
+        return 1
+
+    print("AURA_CALAMARES_VALID")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

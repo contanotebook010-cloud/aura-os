@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-label="Instalador Aura OS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="640" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#11152b"/>
+      <stop offset=".58" stop-color="#20254a"/>
+      <stop offset="1" stop-color="#3b2560"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="190" y1="55" x2="340" y2="245" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#67e8f9"/>
+      <stop offset=".5" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="300" rx="24" fill="url(#bg)"/>
+  <circle cx="265" cy="150" r="92" fill="#0b0d1c" fill-opacity=".55" stroke="url(#mark)" stroke-width="5"/>
+  <path d="m217 207 44-119h17l45 119h-23l-9-26h-44l-9 26h-21Zm39-45h31l-15-48-16 48Z" fill="#f8fafc"/>
+  <path d="M191 218c27-18 51-26 73-26 24 0 45 8 64 23" fill="none" stroke="url(#mark)" stroke-width="7" stroke-linecap="round" opacity=".8"/>
+  <text x="385" y="145" fill="#f8fafc" font-family="sans-serif" font-size="58" font-weight="700">Aura OS</text>
+  <text x="388" y="190" fill="#cbd5e1" font-family="sans-serif" font-size="24">Instalação do sistema</text>
+  <text x="388" y="226" fill="#67e8f9" font-family="sans-serif" font-size="18">Particionar · configurar · inicializar</text>
+</svg>
